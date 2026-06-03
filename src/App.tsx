@@ -6,6 +6,8 @@ import TranslateIcon from "./icons/TranslateIcon";
 import { Word } from "./types";
 import Quiz from "./components/Quiz";
 import Footer from "./components/Footer";
+import RevealCover from "./components/RevealCover";
+import Instructions from "./components/Instructions";
 
 const STORAGE_KEY = "spellingBee_unknownWords";
 
@@ -643,22 +645,7 @@ function App() {
                     </div>
                   )}
                 </div>
-
-                {!showDefinition && (
-                  <div className="absolute bottom-12 w-full left-0 text-gray-400 animate-pulse text-center">
-                    <span className="sm:inline">
-                      Press{" "}
-                      <kbd className="font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">
-                        Space
-                      </kbd>{" "}
-                      or tap to reveal definition
-                    </span>
-                    <span className="hidden sm:inline">
-                      {" "}
-                      • Swipe left/right to navigate
-                    </span>
-                  </div>
-                )}
+                {!showDefinition && <RevealCover />}
               </div>
             )}
             {!completed && activeWords.length > 0 && (
@@ -711,46 +698,14 @@ function App() {
               </div>
             )}
 
-            {/* Instructions Footer */}
+            {/* Instructions about keys */}
             {!completed && activeWords.length > 0 && (
-              <div className="mt-6 sm:mt-12 grid grid-cols-2 sm:flex sm:justify-center gap-4 sm:gap-6 text-sm text-gray-500">
-                <div
-                  onClick={() => handlePrevious()}
-                  className="flex flex-col items-center cursor-pointer hover:text-gray-700 transition-colors"
-                >
-                  <button className="w-35 font-mono bg-white shadow-sm border border-gray-200 px-3 py-2 rounded-md mb-2 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all">
-                    Left Arrow ←
-                  </button>
-                  <span>Go Back</span>
-                </div>
-                <div
-                  onClick={() => setShowDefinition((prev) => !prev)}
-                  className="flex flex-col items-center cursor-pointer hover:text-gray-700 transition-colors"
-                >
-                  <button className="w-35 font-mono bg-white shadow-sm border border-gray-200 px-3 py-2 rounded-md mb-2 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all">
-                    Space
-                  </button>
-                  <span>Toggle Reveal</span>
-                </div>
-                <div
-                  onClick={() => handleKnown()}
-                  className="flex flex-col items-center cursor-pointer hover:text-gray-700 transition-colors"
-                >
-                  <button className="w-35 font-mono bg-white shadow-sm border border-gray-200 px-3 py-2 rounded-md mb-2 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all">
-                    Right Arrow →
-                  </button>
-                  <span>I Know It (Skip)</span>
-                </div>
-                <div
-                  onClick={() => handleUnknown()}
-                  className="flex flex-col items-center cursor-pointer hover:text-gray-700 transition-colors"
-                >
-                  <button className="w-35 font-mono bg-white shadow-sm border border-gray-200 px-3 py-2 rounded-md mb-2 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all">
-                    Down Arrow ↓
-                  </button>
-                  <span>Need Practice</span>
-                </div>
-              </div>
+              <Instructions
+                handlePrevious={handlePrevious}
+                setShowDefinition={setShowDefinition}
+                handleKnown={handleKnown}
+                handleUnknown={handleUnknown}
+              />
             )}
 
             {/* Jump Feature Hint */}

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import wordsData from "./data/words.json";
-import BeeIcon from "./BeeIcon";
+import BeeIcon from "./icons/BeeIcon";
+import SpeakerIcon from "./icons/SpeakerIcon";
+import TranslateIcon from "./icons/TranslateIcon";
 
 interface Word {
   id: string;
@@ -26,6 +28,9 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [jumpInput, setJumpInput] = useState("");
   const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [speakingKey, setSpeakingKey] = useState<string | null>(null);
+  const [translatedWord, setTranslatedWord] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
 
   // Load unknown IDs from localStorage on mount
   useEffect(() => {
@@ -77,6 +82,8 @@ function App() {
     if (currentIndex < activeWords.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setShowDefinition(false);
+      setCopied(false);
+      setTranslatedWord(null);
     } else {
       setCompleted(true);
     }
@@ -99,6 +106,8 @@ function App() {
         setCompleted(true);
       }
       setShowDefinition(false);
+      setCopied(false);
+      setTranslatedWord(null);
     } else {
       nextWord();
     }
@@ -119,6 +128,8 @@ function App() {
       newSet.add(currentWord.id);
       return newSet;
     });
+    setCopied(false);
+    setTranslatedWord(null);
     nextWord();
   }, [currentWord, nextWord]);
 
@@ -126,6 +137,8 @@ function App() {
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
       setShowDefinition(false);
+      setCopied(false);
+      setTranslatedWord(null);
     }
   }, [currentIndex]);
 
@@ -239,6 +252,8 @@ function App() {
     setCurrentIndex(0);
     setCompleted(false);
     setShowDefinition(false);
+    setCopied(false);
+    setTranslatedWord(null);
   };
 
   const handleLevelSelect = (level: number | null) => {
@@ -246,12 +261,16 @@ function App() {
     setCurrentIndex(0);
     setCompleted(false);
     setShowDefinition(false);
+    setCopied(false);
+    setTranslatedWord(null);
   };
 
   const restart = () => {
     setCurrentIndex(0);
     setCompleted(false);
     setShowDefinition(false);
+    setCopied(false);
+    setTranslatedWord(null);
   };
 
   const handleCopy = () => {
@@ -261,6 +280,39 @@ function App() {
         setTimeout(() => setCopied(false), 2000);
       });
     }
+  };
+
+  const handleTranslate = async () => {
+    if (!currentWord?.word || translatedWord) return;
+    
+    setTranslating(true);
+    try {
+      const response = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(currentWord.word)}&langpair=en|zh-CN`
+      );
+      const data = await response.json();
+      if (data.responseStatus === 200) {
+        setTranslatedWord(data.responseData.translatedText);
+      }
+    } catch (error) {
+      console.error("Translation failed:", error);
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  const handleSpeak = (text: string, key: string) => {
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9; // Slightly slower rate for clarity
+    
+    utterance.onstart = () => setSpeakingKey(key);
+    utterance.onend = () => setSpeakingKey(null);
+    utterance.onerror = () => setSpeakingKey(null);
+    
+    window.speechSynthesis.speak(utterance);
   };
 
   const handleJump = (input: string) => {
@@ -445,46 +497,75 @@ function App() {
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCopy();
-              }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-              title="Copy word"
-            >
-              {copied ? (
-                <svg
-                  className="w-5 h-5 text-green-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              )}
-            </button>
+            <div className="absolute top-4 right-4 flex flex-col gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy();
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Copy word"
+              >
+                {copied ? (
+                  <svg
+                    className="w-5 h-5 text-green-500"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                    />
+                  </svg>
+                )}
+              </button>
+              <TranslateIcon
+                isLoading={translating}
+                isTranslated={!!translatedWord}
+                disabled={translating}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (translatedWord) {
+                    setTranslatedWord(null);
+                  } else {
+                    handleTranslate();
+                  }
+                }}
+              />
+            </div>
+            {translatedWord && (
+              <div className="absolute top-20 right-4 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-center z-10 max-w-xs">
+                <p className="text-gray-600 text-xs mb-1">Chinese:</p>
+                <p className="text-lg font-semibold text-blue-600">{translatedWord}</p>
+              </div>
+            )}
             <div className="flex items-center justify-center gap-4 mb-4">
               <h2 className="text-6xl font-extrabold text-gray-900 tracking-tight">
                 {currentWord?.word}
               </h2>
+              <SpeakerIcon
+                isPlaying={speakingKey === "word"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSpeak(currentWord?.word || "", "word");
+                }}
+                title="Read word aloud"
+              />
             </div>
             <div className="flex items-center justify-center gap-4 mb-4">
               {currentWord?.type && (
@@ -501,14 +582,36 @@ function App() {
             <div
               className={`transition-opacity duration-300 ${showDefinition ? "opacity-100" : "opacity-0"}`}
             >
-              <p className="text-2xl text-gray-600 leading-relaxed max-w-xl mx-auto mb-6">
-                {currentWord?.definition}
-              </p>
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <p className="text-2xl text-gray-600 leading-relaxed max-w-xl">
+                  {currentWord?.definition}
+                </p>
+                {currentWord?.definition && (
+                  <SpeakerIcon
+                    isPlaying={speakingKey === "definition"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSpeak(currentWord.definition, "definition");
+                    }}
+                    title="Read definition aloud"
+                  />
+                )}
+              </div>
 
               {currentWord?.example && (
-                <p className="text-lg text-gray-500 italic max-w-xl mx-auto">
-                  {currentWord.example}
-                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <p className="text-lg text-gray-500 italic max-w-xl">
+                    {currentWord.example}
+                  </p>
+                  <SpeakerIcon
+                    isPlaying={speakingKey === "example"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSpeak(currentWord.example || "", "example");
+                    }}
+                    title="Read example aloud"
+                  />
+                </div>
               )}
             </div>
 

@@ -304,6 +304,7 @@ function App() {
       console.error("Translation failed:", error);
     } finally {
       setTranslating(false);
+      setTimeout(() => setTranslatedWord(null), 5000); // Auto-hide translation after 5 seconds
     }
   };
 
@@ -363,17 +364,17 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <header className="w-full p-4 flex flex-row justify-between items-center max-w-4xl gap-4">
+      <header className="w-full p-4 flex flex-col sm:flex-row justify-between items-center max-w-4xl gap-4">
         <div className="flex items-center gap-0">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
             Spelling Bee
           </h1>
           <BeeIcon size="md" floating={true} rotation={315} />
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 w-full sm:w-auto justify-center flex-wrap">
           <button
             onClick={() => setQuizMode(!quizMode)}
-            className={`px-4 py-2 rounded-md font-semibold transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
               quizMode
                 ? "bg-orange-600 text-white hover:bg-orange-700"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -383,56 +384,70 @@ function App() {
           </button>
           <button
             onClick={toggleReviewMode}
-            className={`px-4 py-2 rounded-md font-semibold transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
               reviewMode
                 ? "bg-indigo-600 text-white hover:bg-indigo-700"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
-            {reviewMode ? "Review Mode (Active)" : "All Words Mode"}
+            {reviewMode ? "Review Mode" : "Training Mode"}
           </button>
         </div>
       </header>
 
       {/* Level Tabs */}
       {!reviewMode && !quizMode && (
-        <div className="w-full p-4 flex justify-center gap-2 flex-wrap max-w-4xl">
-          <button
-            onClick={() => handleLevelSelect(null)}
-            className={`px-4 py-2 rounded-md font-semibold transition-colors ${
-              selectedLevel === null
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-          >
-            All Levels
-          </button>
-          {uniqueLevels.map((level) => (
+        <div className="w-full px-4 pt-4 pb-2 max-w-4xl">
+          <div className="sm:hidden w-full">
+            <select
+              value={selectedLevel === null ? "all" : selectedLevel}
+              onChange={(e) => handleLevelSelect(e.target.value === "all" ? null : Number(e.target.value))}
+              className="w-full p-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-700"
+            >
+              <option value="all">📚 All Levels</option>
+              {uniqueLevels.map((level) => (
+                <option key={level} value={level || 1}>⭐ Level {level || 1}</option>
+              ))}
+            </select>
+          </div>
+          <div className="hidden sm:flex justify-center gap-2 flex-wrap">
             <button
-              key={level}
-              onClick={() => handleLevelSelect(level || 1)}
+              onClick={() => handleLevelSelect(null)}
               className={`px-4 py-2 rounded-md font-semibold transition-colors ${
-                selectedLevel === (level || 1)
+                selectedLevel === null
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
               }`}
             >
-              Level {level || 1}
+              All Levels
             </button>
-          ))}
+            {uniqueLevels.map((level) => (
+              <button
+                key={level}
+                onClick={() => handleLevelSelect(level || 1)}
+                className={`px-4 py-2 rounded-md font-semibold transition-colors ${
+                  selectedLevel === (level || 1)
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                Level {level || 1}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Alphabetic / Random Mode Toggle */}
       {!reviewMode && !quizMode && (
-        <div className="w-full p-4 flex justify-center gap-2 flex-wrap max-w-4xl">
+        <div className="w-full px-4 pb-4 flex justify-center gap-2 flex-wrap max-w-4xl">
           <button
             onClick={() => {
               setRandomMode(false);
               setCurrentIndex(0);
               setCompleted(false);
             }}
-            className={`px-4 py-2 rounded-md font-semibold transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
               !randomMode
                 ? "bg-green-600 text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -446,7 +461,7 @@ function App() {
               setCurrentIndex(0);
               setCompleted(false);
             }}
-            className={`px-4 py-2 rounded-md font-semibold transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
               randomMode
                 ? "bg-purple-600 text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -516,7 +531,7 @@ function App() {
                   onClick={toggleReviewMode}
                   className="mt-8 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors w-full sm:w-auto"
                 >
-                  Back to All Words
+                  Back to Training Mode
                 </button>
               </div>
             ) : (

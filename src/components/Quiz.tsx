@@ -107,7 +107,20 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
       <div className="bg-white rounded-2xl shadow-xl p-12 space-y-6">
         <h2 className="text-3xl font-bold text-orange-600 mb-8">Quiz Mode 📝</h2>
         <p className="text-gray-600 text-lg mb-6">Select a level to start a 10-question spelling quiz:</p>
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="sm:hidden w-full">
+          <select
+            defaultValue=""
+            onChange={(e) => startQuiz(e.target.value === "all" ? null : Number(e.target.value))}
+            className="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-xl font-semibold text-gray-700 focus:outline-none focus:border-orange-500 shadow-sm"
+          >
+            <option value="" disabled>Select a level...</option>
+            <option value="all">All Levels</option>
+            {uniqueLevels.map((level) => (
+              <option key={level} value={level || 1}>Level {level || 1}</option>
+            ))}
+          </select>
+        </div>
+        <div className="hidden sm:flex flex-wrap justify-center gap-3">
           <button
             onClick={() => startQuiz(null)}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
@@ -250,13 +263,13 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
           <button
             onClick={() => startQuiz(quizLevel)}
-            className="px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors"
+            className="w-full sm:w-auto px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors"
           >
             Try Again
           </button>
           <button
             onClick={resetQuiz}
-            className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
+            className="w-full sm:w-auto px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
           >
             Exit Quiz
           </button>

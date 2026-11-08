@@ -11,6 +11,7 @@ import RevealCover from "./components/RevealCover";
 import Instructions from "./components/Instructions";
 
 const STORAGE_KEY = "spellingBee_unknownWords";
+const MODE_STORAGE_KEY = "spellingBee_vocabularyMode";
 const OC_UNKNOWN_STORAGE_KEY = "ocReading_unknownWords";
 const OC_CUSTOM_WORDS_STORAGE_KEY = "ocReading_customWords";
 
@@ -48,6 +49,18 @@ function readCustomOcWords(): CustomWordsState {
       words: [],
       error: error instanceof Error ? error.message : "Could not read saved OC vocabulary.",
     };
+  }
+}
+
+function readVocabularyMode(): VocabularyMode {
+  const requestedMode = new URLSearchParams(window.location.search).get("mode");
+  if (requestedMode === "oc" || requestedMode === "spelling") return requestedMode;
+
+  try {
+    return localStorage.getItem(MODE_STORAGE_KEY) === "oc" ? "oc" : "spelling";
+  } catch (error) {
+    console.error("Could not read the saved vocabulary mode.", error);
+    return "spelling";
   }
 }
 
@@ -152,9 +165,7 @@ async function lookupSynonyms(word: string): Promise<string[]> {
 }
 
 function App() {
-  const [mode, setMode] = useState<VocabularyMode>(() =>
-    new URLSearchParams(window.location.search).get("mode") === "oc" ? "oc" : "spelling",
-  );
+  const [mode, setMode] = useState<VocabularyMode>(readVocabularyMode);
   const [autoStartQuiz, setAutoStartQuiz] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("mode") === "oc" && params.get("view") === "quiz";
@@ -209,6 +220,14 @@ function App() {
     const key = mode === "oc" ? OC_UNKNOWN_STORAGE_KEY : STORAGE_KEY;
     localStorage.setItem(key, JSON.stringify(Array.from(unknownIds)));
   }, [mode, unknownIds]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MODE_STORAGE_KEY, mode);
+    } catch (error) {
+      console.error("Could not save the selected vocabulary mode.", error);
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (!settingsOpen) return;

@@ -629,7 +629,7 @@ function App() {
     }
   };
 
-  const handleAddOcWord = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddOcWord = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const word = entryWord.trim();
     const chineseDefinition = entryChineseDefinition.trim();
@@ -655,19 +655,60 @@ function App() {
       category: entryCategory,
       synonyms,
     };
-    if (persistCustomOcWords([...customOcWords, newWord])) {
+    setEntryMessage(`Writing “${word}” to oc_vocab.json…`);
+    try {
+      const response = await fetch("/api/oc-vocabulary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entry: newWord }),
+      });
+
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new Error("The vocabulary write API is unavailable. Run the app with `npm run dev`.");
+      }
+      const result = asRecord(payload);
+      if (!response.ok) {
+        throw new Error(
+          typeof result?.error === "string" ? result.error : `Vocabulary write failed (${response.status}).`,
+        );
+      }
+      if (!isWordEntry(result?.entry)) {
+        throw new Error("The vocabulary API returned an invalid saved entry.");
+      }
+
+      const savedEntry = result.entry;
+      const nextWords = [...customOcWords, savedEntry];
+      let cacheWarning = "";
+      try {
+        localStorage.setItem(OC_CUSTOM_WORDS_STORAGE_KEY, JSON.stringify(nextWords));
+      } catch (error) {
+        cacheWarning = error instanceof Error ? error.message : "Browser storage is unavailable.";
+      }
+      setCustomWordsState({ words: nextWords, error: "" });
       setEntryWord("");
       entryWordRef.current = "";
       setEntryPronunciation("");
       setEntryChineseDefinition("");
       setEntrySynonyms("");
-      setEntryMessage(`Added “${word}”. Saved on this device.`);
+      setEntryMessage(
+        cacheWarning
+          ? `Added “${word}” to oc_vocab.json. Browser cache warning: ${cacheWarning}`
+          : `Added “${word}” to src/data/oc_vocab.json.`,
+      );
+      setAutoFillLoading(false);
       setCurrentIndex(0);
       setCompleted(false);
       setShowDefinition(false);
       setShowOcAddForm(false);
-    } else {
-      setEntryMessage("The word could not be saved. Check browser storage and try again.");
+    } catch (error) {
+      setEntryMessage(
+        error instanceof Error
+          ? `Could not write “${word}” to oc_vocab.json: ${error.message}`
+          : `Could not write “${word}” to oc_vocab.json.`,
+      );
     }
   };
 
@@ -1070,6 +1111,7 @@ function App() {
               </button>
               <button
                 type="submit"
+                disabled={autoFillLoading}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
               >
                 Add word

@@ -73,8 +73,7 @@ function isWordEntry(value: unknown): value is Word {
     typeof candidate.definition === "string" &&
     typeof candidate.chineseDefinition === "string" &&
     candidate.chineseDefinition.trim().length > 0 &&
-    typeof candidate.pronounce === "string" &&
-    candidate.pronounce.trim().length > 0 &&
+    (candidate.pronounce === undefined || typeof candidate.pronounce === "string") &&
     Array.isArray(candidate.synonyms) &&
     candidate.synonyms.length > 0 &&
     candidate.synonyms.every((item) => typeof item === "string" && item.trim().length > 0)
@@ -654,8 +653,8 @@ function App() {
     const chineseDefinition = entryChineseDefinition.trim();
     const synonyms = entrySynonyms.split(",").map((item) => item.trim()).filter(Boolean);
 
-    if (!word || !entryPronunciation.trim() || !chineseDefinition || synonyms.length === 0) {
-      setEntryMessage("Enter the word, pronunciation, Chinese meaning, and at least one synonym.");
+    if (!word || !chineseDefinition || synonyms.length === 0) {
+      setEntryMessage("Enter the word, Chinese meaning, and at least one synonym.");
       return;
     }
     if (activeVocabulary.some((entry) => entry.word.toLowerCase() === word.toLowerCase())) {
@@ -668,7 +667,7 @@ function App() {
       word,
       definition: chineseDefinition,
       chineseDefinition,
-      pronounce: entryPronunciation.trim(),
+      ...(entryPronunciation.trim() ? { pronounce: entryPronunciation.trim() } : {}),
       type: "OC Reading",
       level: 1,
       category: entryCategory,
@@ -1077,9 +1076,8 @@ function App() {
                 </span>
               </label>
               <label className="text-sm font-semibold text-gray-700">
-                Pronunciation
+                Pronunciation (optional)
                 <input
-                  required
                   value={entryPronunciation}
                   onChange={(event) => setEntryPronunciation(event.target.value)}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"

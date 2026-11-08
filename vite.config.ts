@@ -9,7 +9,7 @@ interface VocabularyEntry {
   id: string;
   word: string;
   definition: string;
-  pronounce: string;
+  pronounce?: string;
   type: string;
   level: number;
   chineseDefinition: string;
@@ -68,8 +68,8 @@ function normalizeEntry(value: unknown): VocabularyEntry {
       .filter(Boolean),
   ));
 
-  if (!word || !pronunciation || !chineseDefinition || !synonyms.length) {
-    throw new ApiError(400, "Word, pronunciation, Chinese meaning, and at least one synonym are required.");
+  if (!word || !chineseDefinition || !synonyms.length) {
+    throw new ApiError(400, "Word, Chinese meaning, and at least one synonym are required.");
   }
 
   const categories = new Set(["Reading vocabulary", "Emotion", "Attitude"]);
@@ -83,7 +83,7 @@ function normalizeEntry(value: unknown): VocabularyEntry {
       : `oc-custom-${randomUUID()}`,
     word,
     definition: chineseDefinition,
-    pronounce: pronunciation,
+    ...(pronunciation ? { pronounce: pronunciation } : {}),
     type: "OC Reading",
     level: 1,
     chineseDefinition,

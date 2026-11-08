@@ -68,6 +68,89 @@ function isWordEntry(value: unknown): value is Word {
   );
 }
 
+interface DictionaryLookup {
+  pronunciation: string;
+  synonyms: string[];
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? value as Record<string, unknown>
+    : null;
+}
+
+async function lookupDictionary(word: string): Promise<DictionaryLookup> {
+  const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+  if (!response.ok) {
+    throw new Error(response.status === 404 ? "No dictionary entry was found." : `Dictionary lookup failed (${response.status}).`);
+  }
+
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new Error("Dictionary returned an unexpected response.");
+  const entry = asRecord(payload[0]);
+  if (!entry) throw new Error("No dictionary entry was found.");
+
+  const phonetics = Array.isArray(entry.phonetics) ? entry.phonetics : [];
+  const pronunciation = phonetics
+    .map(asRecord)
+    .find((item) => typeof item?.text === "string" && item.text.trim())?.text;
+  const meanings = Array.isArray(entry.meanings) ? entry.meanings : [];
+  const synonyms = new Set<string>();
+
+  for (const meaningValue of meanings) {
+    const meaning = asRecord(meaningValue);
+    const meaningSynonyms = Array.isArray(meaning?.synonyms) ? meaning.synonyms : [];
+    for (const synonym of meaningSynonyms) {
+      if (typeof synonym === "string" && synonym.trim()) synonyms.add(synonym.trim());
+    }
+
+    const definitions = Array.isArray(meaning?.definitions) ? meaning.definitions : [];
+    for (const definitionValue of definitions) {
+      const definition = asRecord(definitionValue);
+      const definitionSynonyms = Array.isArray(definition?.synonyms) ? definition.synonyms : [];
+      for (const synonym of definitionSynonyms) {
+        if (typeof synonym === "string" && synonym.trim()) synonyms.add(synonym.trim());
+      }
+    }
+  }
+
+  return {
+    pronunciation: typeof pronunciation === "string" ? pronunciation.trim() : "",
+    synonyms: Array.from(synonyms).filter((synonym) => synonym.toLowerCase() !== word.toLowerCase()),
+  };
+}
+
+async function lookupChineseMeaning(word: string): Promise<string> {
+  const response = await fetch(
+    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|zh-CN`,
+  );
+  if (!response.ok) throw new Error(`Translation lookup failed (${response.status}).`);
+
+  const payload: unknown = await response.json();
+  const result = asRecord(payload);
+  const responseData = asRecord(result?.responseData);
+  const translatedText = responseData?.translatedText;
+  if (String(result?.responseStatus) !== "200" || typeof translatedText !== "string" || !translatedText.trim()) {
+    throw new Error("No Chinese translation was returned.");
+  }
+  return translatedText.replace(/<\/?[^>]+(>|$)/g, "").trim();
+}
+
+async function lookupSynonyms(word: string): Promise<string[]> {
+  const response = await fetch(
+    `https://api.datamuse.com/words?rel_syn=${encodeURIComponent(word)}&max=8`,
+  );
+  if (!response.ok) throw new Error(`Synonym lookup failed (${response.status}).`);
+
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new Error("Synonym service returned an unexpected response.");
+  return payload
+    .map(asRecord)
+    .map((item) => item?.word)
+    .filter((synonym): synonym is string => typeof synonym === "string" && synonym.trim().length > 0)
+    .filter((synonym) => synonym.toLowerCase() !== word.toLowerCase());
+}
+
 function App() {
   const [mode, setMode] = useState<VocabularyMode>(() =>
     new URLSearchParams(window.location.search).get("mode") === "oc" ? "oc" : "spelling",
@@ -106,11 +189,14 @@ function App() {
   const [entryPronunciation, setEntryPronunciation] = useState("");
   const [entryChineseDefinition, setEntryChineseDefinition] = useState("");
   const [entrySynonyms, setEntrySynonyms] = useState("");
+  const [autoFillLoading, setAutoFillLoading] = useState(false);
   const [entryCategory, setEntryCategory] = useState("Reading vocabulary");
   const [entryMessage, setEntryMessage] = useState("");
   const [showOcAddForm, setShowOcAddForm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+  const entryWordRef = useRef("");
+  const autoFillWordsRef = useRef(new Set<string>());
 
   // Quiz mode states
   const [quizMode, setQuizMode] = useState(() => {
@@ -446,6 +532,103 @@ function App() {
     setCompleted(false);
   };
 
+  const autoFillMissingOcFields = async () => {
+    const word = entryWord.trim();
+    const wordKey = word.toLowerCase();
+    if (!word || autoFillWordsRef.current.has(wordKey)) return;
+
+    const needsPronunciation = !entryPronunciation.trim();
+    const needsChineseMeaning = !entryChineseDefinition.trim();
+    const needsSynonyms = !entrySynonyms.split(",").some((synonym) => synonym.trim());
+    if (!needsPronunciation && !needsChineseMeaning && !needsSynonyms) {
+      setEntryMessage("All vocabulary fields are already filled.");
+      return;
+    }
+
+    autoFillWordsRef.current.add(wordKey);
+    setAutoFillLoading(true);
+    setEntryMessage(`Looking up missing details for “${word}”…`);
+
+    const dictionaryRequest: Promise<DictionaryLookup | null> =
+      needsPronunciation || needsSynonyms ? lookupDictionary(word) : Promise.resolve(null);
+    const translationRequest: Promise<string | null> =
+      needsChineseMeaning ? lookupChineseMeaning(word) : Promise.resolve(null);
+    const synonymsRequest: Promise<string[]> =
+      needsSynonyms ? lookupSynonyms(word) : Promise.resolve([]);
+
+    try {
+      const [dictionaryResult, translationResult, synonymsResult] = await Promise.allSettled([
+        dictionaryRequest,
+        translationRequest,
+        synonymsRequest,
+      ]);
+      if (entryWordRef.current.trim().toLowerCase() !== wordKey) return;
+
+      const filledFields: string[] = [];
+      const errors: string[] = [];
+      const dictionary = dictionaryResult.status === "fulfilled" ? dictionaryResult.value : null;
+      const dictionaryError = dictionaryResult.status === "rejected"
+        ? dictionaryResult.reason instanceof Error
+          ? dictionaryResult.reason.message
+          : "Dictionary lookup failed."
+        : "";
+
+      if (needsPronunciation) {
+        if (dictionary?.pronunciation) {
+          setEntryPronunciation((current) => current.trim() ? current : dictionary.pronunciation);
+          filledFields.push("pronunciation");
+        } else {
+          errors.push(`pronunciation: ${dictionaryError || "no pronunciation was found"}`);
+        }
+      }
+
+      if (needsChineseMeaning) {
+        const translation = translationResult.status === "fulfilled" ? translationResult.value : null;
+        if (translation) {
+          setEntryChineseDefinition((current) => current.trim() ? current : translation);
+          filledFields.push("Chinese meaning");
+        } else {
+          const reason = translationResult.status === "rejected"
+            ? translationResult.reason instanceof Error
+              ? translationResult.reason.message
+              : "translation lookup failed"
+            : "no Chinese translation was found";
+          errors.push(`Chinese meaning: ${reason}`);
+        }
+      }
+
+      if (needsSynonyms) {
+        const foundSynonyms = new Set(dictionary?.synonyms ?? []);
+        if (synonymsResult.status === "fulfilled") {
+          synonymsResult.value.forEach((synonym) => foundSynonyms.add(synonym));
+        }
+        if (foundSynonyms.size > 0) {
+          setEntrySynonyms((current) => current.trim() ? current : Array.from(foundSynonyms).join(", "));
+          filledFields.push("synonyms");
+        } else {
+          const failures = [
+            dictionaryError,
+            synonymsResult.status === "rejected"
+              ? synonymsResult.reason instanceof Error
+                ? synonymsResult.reason.message
+                : "synonym lookup failed"
+              : "",
+          ].filter(Boolean);
+          errors.push(`synonyms: ${failures.join("; ") || "none were found"}`);
+        }
+      }
+
+      const filledMessage = filledFields.length ? `Auto-filled ${filledFields.join(", ")}.` : "";
+      const missingMessage = errors.length ? `Still missing ${errors.join(" · ")}.` : "";
+      setEntryMessage([filledMessage, missingMessage].filter(Boolean).join(" "));
+    } finally {
+      autoFillWordsRef.current.delete(wordKey);
+      if (entryWordRef.current.trim().toLowerCase() === wordKey) {
+        setAutoFillLoading(false);
+      }
+    }
+  };
+
   const handleAddOcWord = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const word = entryWord.trim();
@@ -474,6 +657,7 @@ function App() {
     };
     if (persistCustomOcWords([...customOcWords, newWord])) {
       setEntryWord("");
+      entryWordRef.current = "";
       setEntryPronunciation("");
       setEntryChineseDefinition("");
       setEntrySynonyms("");
@@ -817,10 +1001,20 @@ function App() {
                 <input
                   required
                   value={entryWord}
-                  onChange={(event) => setEntryWord(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    entryWordRef.current = value;
+                    setEntryWord(value);
+                    setEntryMessage("");
+                    setAutoFillLoading(autoFillWordsRef.current.has(value.trim().toLowerCase()));
+                  }}
+                  onBlur={() => void autoFillMissingOcFields()}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
                   placeholder="e.g. reluctant"
                 />
+                <span className="mt-1 block text-[11px] font-normal text-gray-500">
+                  Missing fields auto-fill when you leave this field.
+                </span>
               </label>
               <label className="text-sm font-semibold text-gray-700">
                 Pronunciation
@@ -866,6 +1060,14 @@ function App() {
               </label>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void autoFillMissingOcFields()}
+                disabled={!entryWord.trim() || autoFillLoading}
+                className="rounded-lg bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-800 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {autoFillLoading ? "Filling…" : "Auto-fill missing fields"}
+              </button>
               <button
                 type="submit"
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"

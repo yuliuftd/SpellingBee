@@ -1,24 +1,51 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Word } from "../types";
+
+type QuizMode = "spelling" | "meaning";
+
+interface QuizOption {
+  id: string;
+  label: string;
+}
 
 interface QuizProps {
   words: Word[];
   uniqueLevels: (number | null)[];
   onExit: () => void;
   handleSpeak: (text: string, key: string) => void;
+  mode?: QuizMode;
+  autoStart?: boolean;
 }
 
-export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizProps) {
+function shuffleArray<T,>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+export default function Quiz({
+  words,
+  uniqueLevels,
+  onExit,
+  handleSpeak,
+  mode = "spelling",
+  autoStart = false,
+}: QuizProps) {
   const [quizLevel, setQuizLevel] = useState<number | null>(null);
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<Word[]>([]);
+  const [quizOptions, setQuizOptions] = useState<QuizOption[][]>([]);
   const [quizCurrentIndex, setQuizCurrentIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState<string[]>([]);
   const [quizResults, setQuizResults] = useState<{
     correct: number;
     total: number;
-    answers: { word: string; userAnswer: string; correct: boolean }[];
+    answers: { word: string; expectedAnswer: string; userAnswer: string; correct: boolean }[];
   } | null>(null);
+  const autoStartApplied = useRef(false);
 
   // Auto-play word in quiz mode when a question appears
   useEffect(() => {
@@ -30,26 +57,48 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
     }
   }, [quizStarted, quizCurrentIndex, quizQuestions, handleSpeak]);
 
-  const shuffleArray = (arr: Word[]): Word[] => {
-    const shuffled = [...arr];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
-
-  const startQuiz = (level: number | null) => {
+  const startQuiz = useCallback((level: number | null) => {
     setQuizLevel(level);
-    const levelWords = level !== null ? words.filter((w) => w.level === level) : words;
+    const levelWords = mode === "meaning" || level === null
+      ? words
+      : words.filter((w) => w.level === level);
     const shuffled = shuffleArray(levelWords);
     const selected = shuffled.slice(0, 10);
+    const options = mode === "meaning"
+      ? selected.map((question) => {
+          const correctOption = {
+            id: question.id,
+            label: question.chineseDefinition ?? question.definition,
+          };
+          const distractors = shuffleArray(
+            words.filter((candidate) => candidate.id !== question.id),
+          )
+            .map((candidate) => ({
+              id: candidate.id,
+              label: candidate.chineseDefinition ?? candidate.definition,
+            }))
+            .filter((option, index, list) =>
+              option.label !== correctOption.label &&
+              list.findIndex((item) => item.label === option.label) === index,
+            )
+            .slice(0, 3);
+          return shuffleArray([correctOption, ...distractors]);
+        })
+      : [];
     setQuizQuestions(selected);
+    setQuizOptions(options);
     setQuizCurrentIndex(0);
     setUserAnswers(new Array(selected.length).fill(""));
     setQuizResults(null);
     setQuizStarted(true);
-  };
+  }, [mode, words]);
+
+  useEffect(() => {
+    if (autoStart && !autoStartApplied.current) {
+      autoStartApplied.current = true;
+      startQuiz(null);
+    }
+  }, [autoStart, startQuiz]);
 
   const handleQuizAnswerChange = (val: string) => {
     setUserAnswers((prev) => {
@@ -75,11 +124,18 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
     let correctCount = 0;
     const answers = quizQuestions.map((q, idx) => {
       const uAnswer = userAnswers[idx] || "";
-      const isCorrect = uAnswer.toLowerCase().trim() === q.word.toLowerCase();
+      const selectedOption = quizOptions[idx]?.find((option) => option.id === uAnswer);
+      const expectedAnswer = mode === "meaning"
+        ? q.chineseDefinition ?? q.definition
+        : q.word;
+      const isCorrect = mode === "meaning"
+        ? uAnswer === q.id
+        : uAnswer.toLowerCase().trim() === q.word.toLowerCase();
       if (isCorrect) correctCount++;
       return {
         word: q.word,
-        userAnswer: uAnswer,
+        expectedAnswer,
+        userAnswer: mode === "meaning" ? selectedOption?.label ?? "" : uAnswer,
         correct: isCorrect,
       };
     });
@@ -96,6 +152,7 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
     setQuizLevel(null);
     setQuizStarted(false);
     setQuizQuestions([]);
+    setQuizOptions([]);
     setQuizCurrentIndex(0);
     setUserAnswers([]);
     setQuizResults(null);
@@ -103,6 +160,30 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
   };
 
   if (!quizStarted && !quizResults) {
+    if (mode === "meaning") {
+      return (
+        <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 space-y-6">
+          <h2 className="text-3xl font-bold text-indigo-700">OC Reading Meaning Quiz 🎯</h2>
+          <p className="text-gray-600 text-lg">
+            Choose the correct Chinese meaning for 10 randomly selected OC reading words.
+          </p>
+          <p className="text-sm text-gray-500">{words.length} words available</p>
+          <button
+            onClick={() => startQuiz(null)}
+            disabled={words.length === 0}
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-semibold transition-colors"
+          >
+            Start 10-word quiz
+          </button>
+          <button
+            onClick={resetQuiz}
+            className="block mx-auto text-sm text-gray-500 hover:text-gray-800"
+          >
+            Back to vocabulary
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="bg-white rounded-2xl shadow-xl p-12 space-y-6">
         <h2 className="text-3xl font-bold text-orange-600 mb-8">Quiz Mode 📝</h2>
@@ -154,48 +235,77 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h3 className="text-xl text-gray-600">Definition:</h3>
-          <p className="text-2xl text-gray-800">{quizQuestions[quizCurrentIndex]?.definition}</p>
-
-          {quizQuestions[quizCurrentIndex]?.example && (
-            <div>
-              <h4 className="text-lg text-gray-600 mb-2">Example:</h4>
-              <p className="text-lg text-gray-700 italic">{quizQuestions[quizCurrentIndex].example}</p>
+        {mode === "meaning" ? (
+          <div className="space-y-5">
+            <h3 className="text-lg text-gray-600">Choose the correct meaning:</h3>
+            <p className="text-4xl font-bold text-gray-900">
+              {quizQuestions[quizCurrentIndex]?.word}
+            </p>
+            {quizQuestions[quizCurrentIndex]?.pronounce && (
+              <p className="text-gray-500">{quizQuestions[quizCurrentIndex].pronounce}</p>
+            )}
+            <div className="grid gap-3 text-left">
+              {(quizOptions[quizCurrentIndex] ?? []).map((option, index) => (
+                <button
+                  type="button"
+                  key={`${option.id}-${index}`}
+                  onClick={() => handleQuizAnswerChange(option.id)}
+                  aria-pressed={userAnswers[quizCurrentIndex] === option.id}
+                  className={`w-full rounded-lg border-2 px-4 py-3 text-left transition-colors ${
+                    userAnswers[quizCurrentIndex] === option.id
+                      ? "border-indigo-500 bg-indigo-50 text-indigo-800"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-indigo-200"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <h3 className="text-xl text-gray-600">Definition:</h3>
+            <p className="text-2xl text-gray-800">{quizQuestions[quizCurrentIndex]?.definition}</p>
 
-          <button
-            onClick={() => handleSpeak(quizQuestions[quizCurrentIndex]?.word || "", "quiz")}
-            className="mt-6 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-semibold"
-          >
-            🔊 Hear the word
-          </button>
-        </div>
+            {quizQuestions[quizCurrentIndex]?.example && (
+              <div>
+                <h4 className="text-lg text-gray-600 mb-2">Example:</h4>
+                <p className="text-lg text-gray-700 italic">{quizQuestions[quizCurrentIndex].example}</p>
+              </div>
+            )}
 
-        <div className="mt-8">
-          <label className="block text-gray-600 font-semibold mb-3">Type the word:</label>
-          <input
-            type="text"
-            value={userAnswers[quizCurrentIndex] || ""}
-            onChange={(e) => handleQuizAnswerChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                if (quizCurrentIndex < quizQuestions.length - 1) {
-                  goToNextQuizQuestion();
-                } else {
-                  submitQuizAnswer();
-                }
-              }
-            }}
-            placeholder="Type and press Enter"
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg font-lg text-center text-2xl focus:outline-none focus:border-orange-600"
-            autoFocus
-          />
-          <p className="text-sm text-gray-500 mt-2">
-            {(userAnswers[quizCurrentIndex] || "").length} / {quizQuestions[quizCurrentIndex]?.word.length || 0} characters
-          </p>
-        </div>
+            <button
+              onClick={() => handleSpeak(quizQuestions[quizCurrentIndex]?.word || "", "quiz")}
+              className="mt-6 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-semibold"
+            >
+              🔊 Hear the word
+            </button>
+
+            <div className="mt-8">
+              <label className="block text-gray-600 font-semibold mb-3">Type the word:</label>
+              <input
+                type="text"
+                value={userAnswers[quizCurrentIndex] || ""}
+                onChange={(e) => handleQuizAnswerChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    if (quizCurrentIndex < quizQuestions.length - 1) {
+                      goToNextQuizQuestion();
+                    } else {
+                      submitQuizAnswer();
+                    }
+                  }
+                }}
+                placeholder="Type and press Enter"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg font-lg text-center text-2xl focus:outline-none focus:border-orange-600"
+                autoFocus
+              />
+              <p className="text-sm text-gray-500 mt-2">
+                {(userAnswers[quizCurrentIndex] || "").length} / {quizQuestions[quizCurrentIndex]?.word.length || 0} characters
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 flex gap-4">
           {quizCurrentIndex > 0 && (
@@ -247,8 +357,13 @@ export default function Quiz({ words, uniqueLevels, onExit, handleSpeak }: QuizP
               }`}
             >
               <p className="font-semibold text-gray-800">Question {idx + 1}</p>
+              {mode === "meaning" && (
+                <p className="text-sm text-gray-600">
+                  Word: <span className="font-mono text-gray-900">{answer.word}</span>
+                </p>
+              )}
               <p className="text-sm text-gray-600">
-                Expected: <span className="font-mono text-gray-900">{answer.word}</span>
+                Expected: <span className="font-mono text-gray-900">{answer.expectedAnswer}</span>
               </p>
               <p className="text-sm text-gray-600">
                 Your answer: <span className="font-mono text-gray-900">{answer.userAnswer || "(empty)"}</span>

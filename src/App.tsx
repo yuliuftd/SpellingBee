@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import wordsData from "./data/words.json";
+import ocVocabData from "./data/oc_vocab.json";
 import BeeIcon from "./icons/BeeIcon";
 import SpeakerIcon from "./icons/SpeakerIcon";
 import TranslateIcon from "./icons/TranslateIcon";
@@ -10,12 +11,87 @@ import RevealCover from "./components/RevealCover";
 import Instructions from "./components/Instructions";
 
 const STORAGE_KEY = "spellingBee_unknownWords";
+const OC_UNKNOWN_STORAGE_KEY = "ocReading_unknownWords";
+const OC_CUSTOM_WORDS_STORAGE_KEY = "ocReading_customWords";
+
+type VocabularyMode = "spelling" | "oc";
+
+interface CustomWordsState {
+  words: Word[];
+  error: string;
+}
+
+function readUnknownIds(key: string): Set<string> {
+  const saved = localStorage.getItem(key);
+  if (!saved) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((id): id is string => typeof id === "string"));
+  } catch (error) {
+    console.error("Failed to parse saved review words", error);
+    return new Set();
+  }
+}
+
+function readCustomOcWords(): CustomWordsState {
+  try {
+    const saved = localStorage.getItem(OC_CUSTOM_WORDS_STORAGE_KEY);
+    if (!saved) return { words: [], error: "" };
+    const parsed: unknown = JSON.parse(saved);
+    if (!Array.isArray(parsed) || !parsed.every(isWordEntry)) {
+      throw new Error("Saved OC vocabulary has an invalid format.");
+    }
+    return { words: parsed, error: "" };
+  } catch (error) {
+    return {
+      words: [],
+      error: error instanceof Error ? error.message : "Could not read saved OC vocabulary.",
+    };
+  }
+}
+
+function isWordEntry(value: unknown): value is Word {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<Word>;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.word === "string" &&
+    typeof candidate.definition === "string" &&
+    typeof candidate.chineseDefinition === "string" &&
+    candidate.chineseDefinition.trim().length > 0 &&
+    typeof candidate.pronounce === "string" &&
+    candidate.pronounce.trim().length > 0 &&
+    Array.isArray(candidate.synonyms) &&
+    candidate.synonyms.length > 0 &&
+    candidate.synonyms.every((item) => typeof item === "string" && item.trim().length > 0)
+  );
+}
 
 function App() {
-  const [words] = useState<Word[]>(wordsData);
+  const [mode, setMode] = useState<VocabularyMode>(() =>
+    new URLSearchParams(window.location.search).get("mode") === "oc" ? "oc" : "spelling",
+  );
+  const [autoStartQuiz, setAutoStartQuiz] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("mode") === "oc" && params.get("view") === "quiz";
+  });
+  const [customWordsState, setCustomWordsState] = useState<CustomWordsState>(readCustomOcWords);
+  const customOcWords = customWordsState.words;
+  const [words] = useState<Word[]>(wordsData as Word[]);
+  const activeVocabulary = useMemo(() => {
+    if (mode === "spelling") return words;
+    const merged = new Map(ocVocabData.map((word) => [word.word.toLowerCase(), word as Word]));
+    customOcWords.forEach((word) => merged.set(word.word.toLowerCase(), word));
+    return Array.from(merged.values()).sort((a, b) => a.word.localeCompare(b.word));
+  }, [customOcWords, mode, words]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDefinition, setShowDefinition] = useState(false);
-  const [unknownIds, setUnknownIds] = useState<Set<string>>(new Set());
+  const [unknownIdsByMode, setUnknownIdsByMode] = useState<Record<VocabularyMode, Set<string>>>(() => ({
+    spelling: readUnknownIds(STORAGE_KEY),
+    oc: readUnknownIds(OC_UNKNOWN_STORAGE_KEY),
+  }));
+  const unknownIds = unknownIdsByMode[mode];
   const [reviewMode, setReviewMode] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
@@ -26,27 +102,61 @@ function App() {
   const [speakingKey, setSpeakingKey] = useState<string | null>(null);
   const [translatedWord, setTranslatedWord] = useState<string | null>(null);
   const [translating, setTranslating] = useState(false);
+  const [entryWord, setEntryWord] = useState("");
+  const [entryPronunciation, setEntryPronunciation] = useState("");
+  const [entryChineseDefinition, setEntryChineseDefinition] = useState("");
+  const [entrySynonyms, setEntrySynonyms] = useState("");
+  const [entryCategory, setEntryCategory] = useState("Reading vocabulary");
+  const [entryMessage, setEntryMessage] = useState("");
+  const [showOcAddForm, setShowOcAddForm] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
 
   // Quiz mode states
-  const [quizMode, setQuizMode] = useState(false);
+  const [quizMode, setQuizMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("mode") === "oc" && params.get("view") === "quiz";
+  });
 
-  // Load unknown IDs from localStorage on mount
+  // Keep the existing spelling review list separate from OC review progress.
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setUnknownIds(new Set(parsed));
-      } catch (e) {
-        console.error("Failed to parse localStorage", e);
+    const key = mode === "oc" ? OC_UNKNOWN_STORAGE_KEY : STORAGE_KEY;
+    localStorage.setItem(key, JSON.stringify(Array.from(unknownIds)));
+  }, [mode, unknownIds]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !settingsMenuRef.current?.contains(event.target)) {
+        setSettingsOpen(false);
       }
-    }
-  }, []);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
 
-  // Save unknown IDs to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(unknownIds)));
-  }, [unknownIds]);
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [settingsOpen]);
+
+  const persistCustomOcWords = (nextWords: Word[]): boolean => {
+    try {
+      localStorage.setItem(OC_CUSTOM_WORDS_STORAGE_KEY, JSON.stringify(nextWords));
+      setCustomWordsState({ words: nextWords, error: "" });
+      return true;
+    } catch (error) {
+      setCustomWordsState((current) => ({
+        ...current,
+        error: error instanceof Error ? error.message : "Could not save the OC vocabulary.",
+      }));
+      return false;
+    }
+  };
 
   // Shuffle function
   const shuffleArray = (arr: Word[]): Word[] => {
@@ -61,10 +171,10 @@ function App() {
   // Derived state for the active list - memoized to prevent re-shuffling on every render
   const activeWords = useMemo(() => {
     let filtered = reviewMode
-      ? words.filter((w) => unknownIds.has(w.id))
+      ? activeVocabulary.filter((w) => unknownIds.has(w.id))
       : selectedLevel !== null
-        ? words.filter((w) => w.level === selectedLevel)
-        : words;
+        ? activeVocabulary.filter((w) => w.level === selectedLevel)
+        : activeVocabulary;
 
     // Apply randomization if enabled
     if (randomMode) {
@@ -72,9 +182,39 @@ function App() {
     }
 
     return filtered;
-  }, [reviewMode, selectedLevel, unknownIds, randomMode, words]);
+  }, [reviewMode, selectedLevel, unknownIds, randomMode, activeVocabulary]);
 
   const currentWord = activeWords[currentIndex];
+
+  const handleJump = useCallback((input: string) => {
+    if (/^\d+$/.test(input)) {
+      const num = parseInt(input);
+      if (num >= 1 && num <= activeWords.length) {
+        setCurrentIndex(num - 1);
+        setShowDefinition(false);
+        setJumpInput("");
+      }
+      return;
+    }
+
+    if (/^[a-zA-Z]$/.test(input)) {
+      const letter = input.toUpperCase();
+      const sortedWords = [...activeWords].sort((a, b) =>
+        a.word.localeCompare(b.word),
+      );
+      const matchIndex = sortedWords.findIndex((w) =>
+        w.word.toUpperCase().startsWith(letter),
+      );
+      if (matchIndex !== -1) {
+        const actualIndex = activeWords.findIndex(
+          (w) => w.id === sortedWords[matchIndex].id,
+        );
+        setCurrentIndex(actualIndex);
+        setShowDefinition(false);
+        setJumpInput("");
+      }
+    }
+  }, [activeWords]);
 
   const nextWord = useCallback(() => {
     if (currentIndex < activeWords.length - 1) {
@@ -92,10 +232,10 @@ function App() {
 
     // If we are in review mode and mark it as known, remove it from unknown list
     if (reviewMode && unknownIds.has(currentWord.id)) {
-      setUnknownIds((prev) => {
-        const newSet = new Set(prev);
+      setUnknownIdsByMode((prev) => {
+        const newSet = new Set(prev[mode]);
         newSet.delete(currentWord.id);
-        return newSet;
+        return { ...prev, [mode]: newSet };
       });
       // In review mode, when we remove the current item, the array length shrinks.
       // So we don't necessarily need to increment currentIndex, but we should handle
@@ -113,6 +253,7 @@ function App() {
     currentWord,
     reviewMode,
     unknownIds,
+    mode,
     currentIndex,
     activeWords.length,
     nextWord,
@@ -121,15 +262,15 @@ function App() {
   const handleUnknown = useCallback(() => {
     if (!currentWord) return;
 
-    setUnknownIds((prev) => {
-      const newSet = new Set(prev);
+    setUnknownIdsByMode((prev) => {
+      const newSet = new Set(prev[mode]);
       newSet.add(currentWord.id);
-      return newSet;
+      return { ...prev, [mode]: newSet };
     });
     setCopied(false);
     setTranslatedWord(null);
     nextWord();
-  }, [currentWord, nextWord]);
+  }, [currentWord, mode, nextWord]);
 
   const handlePrevious = useCallback(() => {
     if (currentIndex > 0) {
@@ -142,7 +283,7 @@ function App() {
 
   // Keyboard Event Listener
   useEffect(() => {
-    if (completed) return;
+    if (completed || quizMode) return;
 
     let jumpTimeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -150,7 +291,8 @@ function App() {
       // Ignore key events if focus is on an input or textarea
       if (
         document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA"
+        document.activeElement?.tagName === "TEXTAREA" ||
+        document.activeElement?.tagName === "SELECT"
       ) {
         return;
       }
@@ -222,11 +364,12 @@ function App() {
     };
   }, [
     completed,
+    quizMode,
     handleKnown,
     handleUnknown,
     handlePrevious,
     jumpInput,
-    activeWords,
+    handleJump,
   ]);
 
   // Touch event handlers for mobile swipe
@@ -262,6 +405,22 @@ function App() {
     setTranslatedWord(null);
   };
 
+  const changeVocabularyMode = (nextMode: VocabularyMode) => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    setReviewMode(false);
+    setSelectedLevel(null);
+    setRandomMode(false);
+    setCurrentIndex(0);
+    setCompleted(false);
+    setShowDefinition(false);
+    setShowOcAddForm(false);
+    setCopied(false);
+    setTranslatedWord(null);
+    setQuizMode(false);
+    setAutoStartQuiz(false);
+  };
+
   const handleLevelSelect = (level: number | null) => {
     setSelectedLevel(level);
     setCurrentIndex(0);
@@ -277,6 +436,94 @@ function App() {
     setShowDefinition(false);
     setCopied(false);
     setTranslatedWord(null);
+  };
+
+  const toggleQuizMode = () => {
+    setQuizMode((current) => !current);
+    setAutoStartQuiz(false);
+    setCurrentIndex(0);
+    setCompleted(false);
+  };
+
+  const handleAddOcWord = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const word = entryWord.trim();
+    const chineseDefinition = entryChineseDefinition.trim();
+    const synonyms = entrySynonyms.split(",").map((item) => item.trim()).filter(Boolean);
+
+    if (!word || !entryPronunciation.trim() || !chineseDefinition || synonyms.length === 0) {
+      setEntryMessage("Enter the word, pronunciation, Chinese meaning, and at least one synonym.");
+      return;
+    }
+    if (activeVocabulary.some((entry) => entry.word.toLowerCase() === word.toLowerCase())) {
+      setEntryMessage(`“${word}” is already in the OC vocabulary.`);
+      return;
+    }
+
+    const newWord: Word = {
+      id: `oc-custom-${crypto.randomUUID()}`,
+      word,
+      definition: chineseDefinition,
+      chineseDefinition,
+      pronounce: entryPronunciation.trim(),
+      type: "OC Reading",
+      level: 1,
+      category: entryCategory,
+      synonyms,
+    };
+    if (persistCustomOcWords([...customOcWords, newWord])) {
+      setEntryWord("");
+      setEntryPronunciation("");
+      setEntryChineseDefinition("");
+      setEntrySynonyms("");
+      setEntryMessage(`Added “${word}”. Saved on this device.`);
+      setCurrentIndex(0);
+      setCompleted(false);
+      setShowDefinition(false);
+      setShowOcAddForm(false);
+    } else {
+      setEntryMessage("The word could not be saved. Check browser storage and try again.");
+    }
+  };
+
+  const handleExportOcWords = () => {
+    const blob = new Blob([JSON.stringify(activeVocabulary, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "oc_vocab.json";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleImportOcWords = async (file?: File) => {
+    if (!file) return;
+    try {
+      const imported: unknown = JSON.parse(await file.text());
+      if (!Array.isArray(imported) || !imported.every(isWordEntry)) {
+        throw new Error("The file must contain an array of valid OC vocabulary entries.");
+      }
+      const originalByWord = new Map(
+        (ocVocabData as Word[]).map((entry) => [entry.word.toLowerCase(), JSON.stringify(entry)]),
+      );
+      const additionsAndOverrides = (imported as Word[]).filter(
+        (entry) => originalByWord.get(entry.word.toLowerCase()) !== JSON.stringify(entry),
+      );
+      if (persistCustomOcWords(additionsAndOverrides)) {
+        setEntryMessage(`Imported ${imported.length} OC vocabulary entries.`);
+        setCurrentIndex(0);
+        setCompleted(false);
+        setShowDefinition(false);
+      } else {
+        setEntryMessage("The imported vocabulary could not be saved in this browser.");
+      }
+    } catch (error) {
+      setEntryMessage(error instanceof Error ? error.message : "Could not import this vocabulary file.");
+    }
   };
 
   const handleCopy = () => {
@@ -322,154 +569,304 @@ function App() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  const handleJump = (input: string) => {
-    // Check if input is a number
-    if (/^\d+$/.test(input)) {
-      const num = parseInt(input);
-      if (num >= 1 && num <= activeWords.length) {
-        setCurrentIndex(num - 1);
-        setShowDefinition(false);
-        setJumpInput("");
-      }
-      return;
-    }
-
-    // Check if input is a single letter
-    if (/^[a-zA-Z]$/.test(input)) {
-      const letter = input.toUpperCase();
-      // Get words sorted alphabetically (default), then find first matching letter
-      const sortedWords = [...activeWords].sort((a, b) =>
-        a.word.localeCompare(b.word),
-      );
-      const matchIndex = sortedWords.findIndex((w) =>
-        w.word.toUpperCase().startsWith(letter),
-      );
-      if (matchIndex !== -1) {
-        // Find the index in activeWords
-        const actualIndex = activeWords.findIndex(
-          (w) => w.id === sortedWords[matchIndex].id,
-        );
-        setCurrentIndex(actualIndex);
-        setShowDefinition(false);
-        setJumpInput("");
-      }
-      return;
-    }
-  };
-
   // Get unique levels
   const uniqueLevels: (number | null)[] = Array.from(
-    new Set(words.map((w) => w.level ?? null)),
+    new Set(activeVocabulary.map((w) => w.level ?? null)),
   ).sort((a, b) => (a || 0) - (b || 0));
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <header className="w-full p-4 flex flex-col sm:flex-row justify-between items-center max-w-4xl gap-4">
+      <header className="w-full p-4 flex flex-col sm:flex-row justify-between items-center max-w-5xl gap-4">
         <div className="flex items-center gap-0">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
             Spelling Bee
           </h1>
           <BeeIcon size="md" floating={true} rotation={315} />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto justify-center flex-wrap">
+        <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Vocabulary mode">
           <button
-            onClick={() => setQuizMode(!quizMode)}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
-              quizMode
-                ? "bg-orange-600 text-white hover:bg-orange-700"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            type="button"
+            onClick={() => changeVocabularyMode("spelling")}
+            aria-pressed={mode === "spelling"}
+            className={`px-4 py-2 rounded-xl font-bold transition-colors whitespace-nowrap ${
+              mode === "spelling"
+                ? "bg-amber-500 text-white shadow-md"
+                : "bg-amber-100 text-amber-900 hover:bg-amber-200"
             }`}
           >
-            {quizMode ? "Quiz Mode (Active)" : "Quiz Mode"}
+            🐝 Spelling Bee 词库
           </button>
           <button
-            onClick={toggleReviewMode}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
-              reviewMode
-                ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            type="button"
+            onClick={() => changeVocabularyMode("oc")}
+            aria-pressed={mode === "oc"}
+            className={`px-4 py-2 rounded-xl font-bold transition-colors whitespace-nowrap ${
+              mode === "oc"
+                ? "bg-indigo-600 text-white shadow-md"
+                : "bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
             }`}
           >
-            {reviewMode ? "Review Mode" : "Training Mode"}
+            🎯 OC Reading 词库
           </button>
+        </div>
+        <div className="relative ml-auto self-end sm:self-auto" ref={settingsMenuRef}>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((open) => !open)}
+            aria-expanded={settingsOpen}
+            aria-haspopup="true"
+            aria-controls="settings-dropdown"
+            title="Settings"
+            aria-label="Settings"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+          >
+            <span aria-hidden="true" className="text-xl leading-none">⚙️</span>
+          </button>
+          {settingsOpen && (
+            <div
+              id="settings-dropdown"
+              className="absolute right-0 top-full z-50 mt-2 w-60 rounded-xl border border-gray-200 bg-white p-2 shadow-xl"
+              aria-label="Settings"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  toggleQuizMode();
+                  setSettingsOpen(false);
+                }}
+                className={`w-full rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                  quizMode ? "bg-orange-100 text-orange-800" : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {mode === "oc"
+                  ? quizMode ? "OC Meaning Quiz (Active)" : "OC Meaning Quiz"
+                  : quizMode ? "Quiz Mode (Active)" : "Quiz Mode"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleReviewMode();
+                  setSettingsOpen(false);
+                }}
+                className={`mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                  reviewMode ? "bg-indigo-100 text-indigo-800" : "text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                {reviewMode ? "Review Mode" : "Training Mode"}
+              </button>
+              {mode === "oc" && (
+                <div className="mt-1 border-t border-gray-100 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowOcAddForm((open) => !open);
+                      setQuizMode(false);
+                      setAutoStartQuiz(false);
+                      setSettingsOpen(false);
+                    }}
+                    aria-expanded={showOcAddForm}
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                  >
+                    {showOcAddForm ? "Hide Add Word Form" : "Add OC Word"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleExportOcWords();
+                      setSettingsOpen(false);
+                    }}
+                    className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                  >
+                    Export oc_vocab.json
+                  </button>
+                  <label className="mt-1 block cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
+                    Import JSON
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = "";
+                        setSettingsOpen(false);
+                        setQuizMode(false);
+                        setAutoStartQuiz(false);
+                        if (file) void handleImportOcWords(file);
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Level Tabs */}
       {!reviewMode && !quizMode && (
-        <div className="w-full px-4 pt-4 pb-2 max-w-4xl">
-          <div className="sm:hidden w-full">
-            <select
-              value={selectedLevel === null ? "all" : selectedLevel}
-              onChange={(e) => handleLevelSelect(e.target.value === "all" ? null : Number(e.target.value))}
-              className="w-full p-3 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-gray-700"
-            >
-              <option value="all">📚 All Levels</option>
-              {uniqueLevels.map((level) => (
-                <option key={level} value={level || 1}>⭐ Level {level || 1}</option>
-              ))}
-            </select>
-          </div>
-          <div className="hidden sm:flex justify-center gap-2 flex-wrap">
+        <div className="w-full max-w-5xl px-4 pb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5">
             <button
-              onClick={() => handleLevelSelect(null)}
-              className={`px-4 py-2 rounded-md font-semibold transition-colors ${
-                selectedLevel === null
-                  ? "bg-blue-600 text-white"
+              type="button"
+              title="Sort alphabetically A to Z"
+              aria-label="Sort alphabetically A to Z"
+              aria-pressed={!randomMode}
+              onClick={() => {
+                setRandomMode(false);
+                setCurrentIndex(0);
+                setCompleted(false);
+              }}
+              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+                !randomMode
+                  ? "bg-green-600 text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
               }`}
             >
-              All Levels
+              <span className="text-[10px] font-extrabold leading-none">A↓Z</span>
             </button>
-            {uniqueLevels.map((level) => (
+            <button
+              type="button"
+              title="Shuffle randomly"
+              aria-label="Shuffle randomly"
+              aria-pressed={randomMode}
+              onClick={() => {
+                setRandomMode(true);
+                setCurrentIndex(0);
+                setCompleted(false);
+              }}
+              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+                randomMode
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <rect x="4" y="4" width="16" height="16" rx="3" />
+                <circle cx="8" cy="8" r="1" fill="currentColor" />
+                <circle cx="16" cy="8" r="1" fill="currentColor" />
+                <circle cx="12" cy="12" r="1" fill="currentColor" />
+                <circle cx="8" cy="16" r="1" fill="currentColor" />
+                <circle cx="16" cy="16" r="1" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+          {mode === "spelling" && (
+            <div
+              role="group"
+              aria-label="Spelling Bee levels"
+              className="inline-flex shrink-0 overflow-hidden rounded-md border border-gray-300 bg-white shadow-sm"
+            >
               <button
-                key={level}
-                onClick={() => handleLevelSelect(level || 1)}
-                className={`px-4 py-2 rounded-md font-semibold transition-colors ${
-                  selectedLevel === (level || 1)
+                type="button"
+                onClick={() => handleLevelSelect(null)}
+                aria-pressed={selectedLevel === null}
+                className={`border-r border-gray-300 px-2 py-1.5 text-xs font-semibold transition-colors sm:px-2.5 sm:text-sm ${
+                  selectedLevel === null
                     ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
-                Level {level || 1}
+                All
               </button>
-            ))}
-          </div>
+              {uniqueLevels.map((level) => (
+                <button
+                  type="button"
+                  key={level}
+                  onClick={() => handleLevelSelect(level || 1)}
+                  aria-pressed={selectedLevel === (level || 1)}
+                  className={`border-r border-gray-300 px-2 py-1.5 text-xs font-semibold transition-colors last:border-r-0 sm:px-2.5 sm:text-sm ${
+                    selectedLevel === (level || 1)
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  L{level || 1}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Alphabetic / Random Mode Toggle */}
-      {!reviewMode && !quizMode && (
-        <div className="w-full px-4 pb-4 flex justify-center gap-2 flex-wrap max-w-4xl">
-          <button
-            onClick={() => {
-              setRandomMode(false);
-              setCurrentIndex(0);
-              setCompleted(false);
-            }}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
-              !randomMode
-                ? "bg-green-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-          >
-            A–Z (Alphabetic)
-          </button>
-          <button
-            onClick={() => {
-              setRandomMode(true);
-              setCurrentIndex(0);
-              setCompleted(false);
-            }}
-            className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-semibold transition-colors whitespace-nowrap ${
-              randomMode
-                ? "bg-purple-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-          >
-            🎲 (Random)
-          </button>
-        </div>
+      {mode === "oc" && !quizMode && (
+        <section className="w-full max-w-5xl px-4 pt-3">
+          {entryMessage && <p className="mt-2 text-sm text-indigo-700" role="status">{entryMessage}</p>}
+          {customWordsState.error && (
+            <p className="mt-2 text-sm text-red-600" role="alert">{customWordsState.error}</p>
+          )}
+          {showOcAddForm && (
+            <form
+              onSubmit={handleAddOcWord}
+              className="mt-3 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"
+            >
+              <div className="mb-4">
+                <h2 className="text-lg font-bold text-indigo-900">OC Reading Quick Add</h2>
+                <p className="text-sm text-gray-500">Save a new reading word to this browser’s OC vocabulary.</p>
+              </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <label className="text-sm font-semibold text-gray-700">
+                Word
+                <input
+                  required
+                  value={entryWord}
+                  onChange={(event) => setEntryWord(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
+                  placeholder="e.g. reluctant"
+                />
+              </label>
+              <label className="text-sm font-semibold text-gray-700">
+                Pronunciation
+                <input
+                  required
+                  value={entryPronunciation}
+                  onChange={(event) => setEntryPronunciation(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
+                  placeholder="/rɪˈlʌktənt/"
+                />
+              </label>
+              <label className="text-sm font-semibold text-gray-700">
+                Chinese meaning
+                <input
+                  required
+                  value={entryChineseDefinition}
+                  onChange={(event) => setEntryChineseDefinition(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
+                  placeholder="不情愿的"
+                />
+              </label>
+              <label className="text-sm font-semibold text-gray-700">
+                English synonyms
+                <input
+                  required
+                  value={entrySynonyms}
+                  onChange={(event) => setEntrySynonyms(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
+                  placeholder="unwilling, hesitant"
+                />
+              </label>
+              <label className="text-sm font-semibold text-gray-700">
+                Category
+                <select
+                  value={entryCategory}
+                  onChange={(event) => setEntryCategory(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-normal"
+                >
+                  <option>Reading vocabulary</option>
+                  <option>Emotion</option>
+                  <option>Attitude</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
+              >
+                Add word
+              </button>
+            </div>
+            </form>
+          )}
+        </section>
       )}
 
       <main
@@ -478,9 +875,14 @@ function App() {
       >
         {quizMode ? (
           <Quiz
-            words={words}
+            words={activeVocabulary}
             uniqueLevels={uniqueLevels}
-            onExit={() => setQuizMode(false)}
+            mode={mode === "oc" ? "meaning" : "spelling"}
+            autoStart={autoStartQuiz}
+            onExit={() => {
+              setQuizMode(false);
+              setAutoStartQuiz(false);
+            }}
             handleSpeak={handleSpeak}
           />
         ) : (
@@ -625,24 +1027,42 @@ function App() {
                     </p>
                   )}
                 </div>
+                {mode === "oc" && currentWord?.category && (
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-indigo-500">
+                    {currentWord.category}
+                  </p>
+                )}
                 <div
                   className={`transition-opacity duration-300 ${showDefinition ? "opacity-100" : "opacity-0"}`}
                 >
                   <div className="flex items-center justify-center gap-3 mb-6">
                     <p className="text-2xl text-gray-600 leading-relaxed max-w-xl">
-                      {currentWord?.definition}
+                      {mode === "oc"
+                        ? currentWord?.chineseDefinition ?? currentWord?.definition
+                        : currentWord?.definition}
                     </p>
-                    {currentWord?.definition && (
+                    {(currentWord?.definition || currentWord?.chineseDefinition) && (
                       <SpeakerIcon
                         isPlaying={speakingKey === "definition"}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSpeak(currentWord.definition, "definition");
+                          handleSpeak(
+                            mode === "oc"
+                              ? currentWord.chineseDefinition ?? currentWord.definition
+                              : currentWord.definition,
+                            "definition",
+                          );
                         }}
                         title="Read definition aloud"
                       />
                     )}
                   </div>
+
+                  {mode === "oc" && currentWord?.synonyms && currentWord.synonyms.length > 0 && (
+                    <p className="mb-5 text-base text-indigo-700">
+                      Synonyms: {currentWord.synonyms.join(", ")}
+                    </p>
+                  )}
 
                   {currentWord?.example && (
                     <div className="flex items-center justify-center gap-3">

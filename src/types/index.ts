@@ -6,4 +6,7 @@ export interface Word {
   type?: string;
   example?: string;
   level?: number;
+  chineseDefinition?: string;
+  synonyms?: string[];
+  category?: string;
 }

@@ -1255,7 +1255,7 @@ function App() {
                   </div>
                 )}
                 <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
-                  <h2 className="text-6xl font-extrabold text-gray-900 tracking-tight">
+                  <h2 className="text-4xl sm:text-6xl font-extrabold text-gray-900 tracking-tight">
                     {currentWord?.word}
                   </h2>
                   <SpeakerIcon

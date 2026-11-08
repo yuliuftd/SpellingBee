@@ -2,7 +2,12 @@
 
 @layer base {
   body {
-    background-color: var(--color-gray-50);
+    background-color: #f1f6fc;
+    background-image: url("/tech-background.svg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: fixed;
     color: var(--color-gray-900);
   }
 }

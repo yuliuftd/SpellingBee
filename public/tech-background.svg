@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" fill="none">
+  <defs>
+    <linearGradient id="base" x1="140" y1="0" x2="1740" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fbff"/>
+      <stop offset=".52" stop-color="#edf5fc"/>
+      <stop offset="1" stop-color="#f5f8fd"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="matrix(660 460 -560 800 1580 140)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#79c5ee" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#79c5ee" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0v48" stroke="#4387b8" stroke-opacity=".07"/>
+      <circle cx="0" cy="0" r="1.25" fill="#4387b8" fill-opacity=".12"/>
+    </pattern>
+    <linearGradient id="trace" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#4f9bd1" stop-opacity=".02"/>
+      <stop offset=".5" stop-color="#4f9bd1" stop-opacity=".17"/>
+      <stop offset="1" stop-color="#4f9bd1" stop-opacity=".02"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#base)" d="M0 0h1920v1080H0z"/>
+  <path fill="url(#glow)" d="M0 0h1920v1080H0z"/>
+  <path fill="url(#grid)" d="M0 0h1920v1080H0z"/>
+  <g stroke="url(#trace)" stroke-width="2">
+    <path d="M0 218h178l40 40h144m-362 126h260l48-48h92"/>
+    <path d="M0 795h220l50-50h168m-438 176h138l42-42h210"/>
+    <path d="M1920 252h-184l-48 48h-190m422 164h-260l-42-42h-150"/>
+    <path d="M1920 790h-220l-54-54h-172m446 176h-140l-44-44h-204"/>
+  </g>
+  <g fill="#4d9acb" fill-opacity=".2">
+    <circle cx="362" cy="258" r="4"/>
+    <circle cx="268" cy="745" r="4"/>
+    <circle cx="1490" cy="300" r="4"/>
+    <circle cx="1470" cy="736" r="4"/>
+    <circle cx="210" cy="384" r="3"/>
+    <circle cx="1704" cy="416" r="3"/>
+  </g>
+</svg>

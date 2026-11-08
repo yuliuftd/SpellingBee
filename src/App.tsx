@@ -408,6 +408,7 @@ function App() {
   const changeVocabularyMode = (nextMode: VocabularyMode) => {
     if (nextMode === mode) return;
     setMode(nextMode);
+    setEntryMessage("");
     setReviewMode(false);
     setSelectedLevel(null);
     setRandomMode(false);
@@ -575,41 +576,46 @@ function App() {
   ).sort((a, b) => (a || 0) - (b || 0));
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <header className="w-full p-4 flex flex-col sm:flex-row justify-between items-center max-w-5xl gap-4">
+    <div className="min-h-screen flex flex-col items-center justify-start p-4">
+      <header className="w-full max-w-5xl p-4 flex flex-col items-center gap-3 sm:flex-row sm:justify-between sm:gap-4">
         <div className="flex items-center gap-0">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
             Spelling Bee
           </h1>
           <BeeIcon size="md" floating={true} rotation={315} />
         </div>
-        <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Vocabulary mode">
-          <button
-            type="button"
-            onClick={() => changeVocabularyMode("spelling")}
-            aria-pressed={mode === "spelling"}
-            className={`px-4 py-2 rounded-xl font-bold transition-colors whitespace-nowrap ${
-              mode === "spelling"
-                ? "bg-amber-500 text-white shadow-md"
-                : "bg-amber-100 text-amber-900 hover:bg-amber-200"
-            }`}
-          >
-            🐝 Spelling Bee 词库
-          </button>
-          <button
-            type="button"
-            onClick={() => changeVocabularyMode("oc")}
-            aria-pressed={mode === "oc"}
-            className={`px-4 py-2 rounded-xl font-bold transition-colors whitespace-nowrap ${
-              mode === "oc"
-                ? "bg-indigo-600 text-white shadow-md"
-                : "bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
-            }`}
-          >
-            🎯 OC Reading 词库
-          </button>
-        </div>
-        <div className="relative ml-auto self-end sm:self-auto" ref={settingsMenuRef}>
+        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+          <div className="flex flex-nowrap items-center gap-1" role="group" aria-label="Vocabulary mode">
+            <button
+              type="button"
+              onClick={() => changeVocabularyMode("spelling")}
+              aria-pressed={mode === "spelling"}
+              aria-label="Spelling Bee vocabulary"
+              className={`rounded-xl px-2 py-2 text-xs font-bold transition-colors whitespace-nowrap sm:px-4 sm:text-base ${
+                mode === "spelling"
+                  ? "bg-amber-500 text-white shadow-md"
+                  : "bg-amber-100 text-amber-900 hover:bg-amber-200"
+              }`}
+            >
+              <span className="sm:hidden">🐝 Spelling</span>
+              <span className="hidden sm:inline">🐝 Spelling Bee</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => changeVocabularyMode("oc")}
+              aria-pressed={mode === "oc"}
+              aria-label="OC Reading vocabulary"
+              className={`rounded-xl px-2 py-2 text-xs font-bold transition-colors whitespace-nowrap sm:px-4 sm:text-base ${
+                mode === "oc"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
+              }`}
+            >
+              <span className="sm:hidden">🎯 OC Reading</span>
+              <span className="hidden sm:inline">🎯 OC Reading</span>
+            </button>
+          </div>
+        <div className="relative shrink-0" ref={settingsMenuRef}>
           <button
             type="button"
             onClick={() => setSettingsOpen((open) => !open)}
@@ -700,6 +706,7 @@ function App() {
             </div>
           )}
         </div>
+        </div>
       </header>
 
       {!reviewMode && !quizMode && (
@@ -715,13 +722,16 @@ function App() {
                 setCurrentIndex(0);
                 setCompleted(false);
               }}
-              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+              className={`flex h-8 w-8 items-center justify-center transition-colors ${
                 !randomMode
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  ? "text-blue-700"
+                  : "text-gray-400 hover:text-blue-600"
               }`}
             >
-              <span className="text-[10px] font-extrabold leading-none">A↓Z</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3.5 6h9M3.5 10h6.5M3.5 14h4" />
+                <path d="M18 18V5m-3 3 3-3 3 3" />
+              </svg>
             </button>
             <button
               type="button"
@@ -733,19 +743,15 @@ function App() {
                 setCurrentIndex(0);
                 setCompleted(false);
               }}
-              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+              className={`flex h-8 w-8 items-center justify-center transition-colors ${
                 randomMode
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  ? "text-purple-700"
+                  : "text-gray-400 hover:text-purple-600"
               }`}
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <rect x="4" y="4" width="16" height="16" rx="3" />
-                <circle cx="8" cy="8" r="1" fill="currentColor" />
-                <circle cx="16" cy="8" r="1" fill="currentColor" />
-                <circle cx="12" cy="12" r="1" fill="currentColor" />
-                <circle cx="8" cy="16" r="1" fill="currentColor" />
-                <circle cx="16" cy="16" r="1" fill="currentColor" />
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7h2c4 0 6 10 10 10h5m-3-3 3 3-3 3" />
+                <path d="M3 17h2c4 0 6-10 10-10h5m-3-3 3 3-3 3" />
               </svg>
             </button>
           </div>
@@ -787,13 +793,16 @@ function App() {
         </div>
       )}
 
-      {mode === "oc" && !quizMode && (
-        <section className="w-full max-w-5xl px-4 pt-3">
-          {entryMessage && <p className="mt-2 text-sm text-indigo-700" role="status">{entryMessage}</p>}
-          {customWordsState.error && (
-            <p className="mt-2 text-sm text-red-600" role="alert">{customWordsState.error}</p>
+      <section className="w-full max-w-5xl px-4">
+        <div className="h-5 overflow-hidden text-sm leading-5">
+          {mode === "oc" && !quizMode && customWordsState.error && (
+            <p className="truncate text-red-600" role="alert">{customWordsState.error}</p>
           )}
-          {showOcAddForm && (
+          {mode === "oc" && !quizMode && !customWordsState.error && entryMessage && (
+            <p className="truncate text-indigo-700" role="status">{entryMessage}</p>
+          )}
+        </div>
+        {mode === "oc" && !quizMode && showOcAddForm && (
             <form
               onSubmit={handleAddOcWord}
               className="mt-3 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"
@@ -865,9 +874,8 @@ function App() {
               </button>
             </div>
             </form>
-          )}
-        </section>
-      )}
+        )}
+      </section>
 
       <main
         className="w-full max-w-2xl text-center"

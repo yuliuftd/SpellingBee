@@ -720,5 +720,159 @@
     "category": "Reading vocabulary",
     "synonyms": ["incompetence", "clumsiness", "unskillfulness"],
     "example": "The task was made harder by his ineptitude with the equipment."
+  },
+  {
+    "id": "oc-066",
+    "word": "obviate",
+    "entryType": "word",
+    "definition": "to remove the need for something or make a problem unnecessary",
+    "chineseDefinition": "消除；避免……的必要",
+    "type": "verb",
+    "category": "Reading vocabulary",
+    "synonyms": ["prevent", "eliminate", "avoid"],
+    "example": "Clear instructions can obviate the need for extra help."
+  },
+  {
+    "id": "oc-067",
+    "word": "impair",
+    "entryType": "word",
+    "definition": "to weaken or damage something, especially its ability to work properly",
+    "chineseDefinition": "损害；削弱",
+    "type": "verb",
+    "category": "Reading vocabulary",
+    "synonyms": ["damage", "weaken", "diminish"],
+    "example": "Lack of sleep can impair a person's concentration."
+  },
+  {
+    "id": "oc-068",
+    "word": "abolished",
+    "entryType": "word",
+    "definition": "officially ended or removed a law, system, or practice",
+    "chineseDefinition": "废除了；取消了",
+    "type": "verb",
+    "category": "Reading vocabulary",
+    "synonyms": ["ended", "eliminated", "repealed"],
+    "example": "The outdated rule was abolished after the review."
+  },
+  {
+    "id": "oc-069",
+    "word": "encored",
+    "entryType": "word",
+    "definition": "performed again or called for another performance after an audience's applause",
+    "chineseDefinition": "返场演出；要求加演",
+    "type": "verb",
+    "category": "Reading vocabulary",
+    "synonyms": ["repeated", "replayed", "performed again"],
+    "example": "The band encored with its most popular song."
+  },
+  {
+    "id": "oc-070",
+    "word": "perception",
+    "entryType": "word",
+    "definition": "the way someone notices, understands, or interprets something",
+    "chineseDefinition": "感知；看法；理解",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["understanding", "awareness", "interpretation"],
+    "example": "Her perception of the situation changed after she heard both sides."
+  },
+  {
+    "id": "oc-071",
+    "word": "misnomer",
+    "entryType": "word",
+    "definition": "a name or description that is inaccurate or unsuitable",
+    "chineseDefinition": "误称；不恰当的名称",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["wrong name", "inaccurate label", "misdescription"],
+    "example": "Calling the tiny room a ballroom would be a misnomer."
+  },
+  {
+    "id": "oc-072",
+    "word": "psychological",
+    "entryType": "word",
+    "definition": "related to the mind, thoughts, feelings, or behaviour",
+    "chineseDefinition": "心理的；心理学的",
+    "type": "adjective",
+    "category": "Reading vocabulary",
+    "synonyms": ["mental", "emotional", "cognitive"],
+    "example": "The study explored the psychological effects of moving to a new school."
+  },
+  {
+    "id": "oc-073",
+    "word": "environmental",
+    "entryType": "word",
+    "definition": "related to the natural world or the conditions around people and other living things",
+    "chineseDefinition": "环境的；与自然环境有关的",
+    "type": "adjective",
+    "category": "Reading vocabulary",
+    "synonyms": ["ecological", "natural", "green"],
+    "example": "The class discussed environmental ways to reduce waste."
+  },
+  {
+    "id": "oc-074",
+    "word": "celestial",
+    "entryType": "word",
+    "definition": "related to the sky, stars, or outer space",
+    "chineseDefinition": "天体的；天空的",
+    "type": "adjective",
+    "category": "Reading vocabulary",
+    "synonyms": ["astronomical", "cosmic", "heavenly"],
+    "example": "The telescope revealed a beautiful celestial object."
+  },
+  {
+    "id": "oc-075",
+    "word": "buckle",
+    "entryType": "word",
+    "definition": "to fasten with a clasp, or to bend or give way under pressure",
+    "chineseDefinition": "扣紧；弯曲；承受不住",
+    "type": "verb",
+    "category": "Reading vocabulary",
+    "synonyms": ["fasten", "bend", "collapse"],
+    "example": "The old bridge began to buckle under the heavy load."
+  },
+  {
+    "id": "oc-076",
+    "word": "crest",
+    "entryType": "word",
+    "definition": "the highest point of a hill or wave",
+    "chineseDefinition": "顶峰；浪尖",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["peak", "summit", "top"],
+    "example": "The hikers paused at the crest of the hill."
+  },
+  {
+    "id": "oc-077",
+    "word": "dose",
+    "entryType": "word",
+    "definition": "a measured amount of medicine or another substance taken at one time",
+    "chineseDefinition": "剂量；一次用量",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["amount", "quantity", "measure"],
+    "example": "Always follow the instructions when taking a dose of medicine."
+  },
+  {
+    "id": "oc-078",
+    "word": "profanity",
+    "entryType": "word",
+    "definition": "language that is offensive or disrespectful, especially swear words",
+    "chineseDefinition": "脏话；亵渎性言语",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["swearing", "obscenity", "curse word"],
+    "example": "The teacher asked the students to avoid profanity in class."
+  },
+  {
+    "id": "oc-079",
+    "word": "pour over",
+    "entryType": "phrase",
+    "definition": "to make liquid flow from a container onto or across something",
+    "chineseDefinition": "把液体倒在……上；倾倒",
+    "type": "verb phrase",
+    "category": "Reading vocabulary",
+    "synonyms": ["pour onto", "douse", "cover with liquid"],
+    "example": "She poured water over the dry soil."
   }
 ]

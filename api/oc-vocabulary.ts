@@ -5,12 +5,13 @@ import { MongoClient, type Collection } from "mongodb";
 interface VocabularyEntry {
   id: string;
   word: string;
+  entryType?: "word" | "phrase";
   definition: string;
   pronounce?: string;
   type: string;
   level: number;
   chineseDefinition: string;
-  synonyms: string[];
+  synonyms?: string[];
   category: string;
 }
 
@@ -44,6 +45,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function normalizeVocabularyTerm(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
+}
+
 function getMongoClient(): Promise<MongoClient> {
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new ApiError(503, "MongoDB is not configured. Set MONGODB_URI in Vercel.");
@@ -68,6 +73,7 @@ async function getVocabularyCollection(): Promise<Collection<VocabularyDocument>
 function normalizeEntry(value: unknown): VocabularyEntry {
   const valueRecord = asRecord(value);
   const word = typeof valueRecord?.word === "string" ? valueRecord.word.trim() : "";
+  const entryType = valueRecord?.entryType === undefined ? "word" : valueRecord.entryType;
   const chineseDefinition = typeof valueRecord?.chineseDefinition === "string"
     ? valueRecord.chineseDefinition.trim()
     : "";
@@ -82,8 +88,11 @@ function normalizeEntry(value: unknown): VocabularyEntry {
       .filter(Boolean),
   ));
 
+  if (entryType !== "word" && entryType !== "phrase") {
+    throw new ApiError(400, "Entry type must be word or phrase.");
+  }
   if (!word || word.length > 100) {
-    throw new ApiError(400, "Word is required and must be 100 characters or fewer.");
+    throw new ApiError(400, "Word or phrase is required and must be 100 characters or fewer.");
   }
   if (!chineseDefinition || chineseDefinition.length > 500) {
     throw new ApiError(400, "Chinese meaning is required and must be 500 characters or fewer.");
@@ -91,8 +100,12 @@ function normalizeEntry(value: unknown): VocabularyEntry {
   if (pronunciation.length > 200) {
     throw new ApiError(400, "Pronunciation must be 200 characters or fewer.");
   }
-  if (!synonyms.length || synonyms.length > 20 || synonyms.some((synonym) => synonym.length > 100)) {
-    throw new ApiError(400, "Provide 1 to 20 synonyms, each 100 characters or fewer.");
+  if (
+    (entryType === "word" && !synonyms.length) ||
+    synonyms.length > 20 ||
+    synonyms.some((synonym) => synonym.length > 100)
+  ) {
+    throw new ApiError(400, "Words need 1 to 20 synonyms, each 100 characters or fewer.");
   }
 
   const categories = new Set(["Reading vocabulary", "Emotion", "Attitude"]);
@@ -103,12 +116,13 @@ function normalizeEntry(value: unknown): VocabularyEntry {
   return {
     id: `oc-custom-${randomUUID()}`,
     word,
+    entryType,
     definition: chineseDefinition,
     ...(pronunciation ? { pronounce: pronunciation } : {}),
     type: "OC Reading",
     level: 1,
     chineseDefinition,
-    synonyms,
+    ...(synonyms.length ? { synonyms } : {}),
     category,
   };
 }
@@ -193,7 +207,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const entry = normalizeEntry(payload?.entry);
     const collection = await getVocabularyCollection();
     await collection.insertOne({
-      normalizedWord: entry.word.toLocaleLowerCase("en"),
+      normalizedWord: normalizeVocabularyTerm(entry.word),
       entry,
       createdAt: new Date(),
     });
@@ -203,7 +217,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return json(response, error.statusCode, { error: error.message, writePasswordRequired });
     }
     if (asRecord(error)?.code === 11000) {
-      return json(response, 409, { error: "That word already exists in the OC vocabulary.", writePasswordRequired });
+      return json(response, 409, { error: "That entry already exists in the OC vocabulary.", writePasswordRequired });
     }
     console.error("Could not write an OC vocabulary entry to MongoDB.", error);
     return json(response, 500, {

@@ -8,12 +8,13 @@ import { defineConfig, type Plugin } from "vite";
 interface VocabularyEntry {
   id: string;
   word: string;
+  entryType?: "word" | "phrase";
   definition: string;
   pronounce?: string;
   type: string;
   level: number;
   chineseDefinition: string;
-  synonyms: string[];
+  synonyms?: string[];
   category: string;
 }
 
@@ -27,6 +28,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null
     ? value as Record<string, unknown>
     : null;
+}
+
+function normalizeVocabularyTerm(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
 }
 
 function sendJson(response: ServerResponse, statusCode: number, value: unknown) {
@@ -56,6 +61,7 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 function normalizeEntry(value: unknown): VocabularyEntry {
   const entry = asRecord(value);
   const word = typeof entry?.word === "string" ? entry.word.trim() : "";
+  const entryType = entry?.entryType === undefined ? "word" : entry.entryType;
   const pronunciation = typeof entry?.pronounce === "string" ? entry.pronounce.trim() : "";
   const chineseDefinition = typeof entry?.chineseDefinition === "string"
     ? entry.chineseDefinition.trim()
@@ -68,8 +74,16 @@ function normalizeEntry(value: unknown): VocabularyEntry {
       .filter(Boolean),
   ));
 
-  if (!word || !chineseDefinition || !synonyms.length) {
-    throw new ApiError(400, "Word, Chinese meaning, and at least one synonym are required.");
+  if (entryType !== "word" && entryType !== "phrase") {
+    throw new ApiError(400, "Entry type must be word or phrase.");
+  }
+  if (!word || !chineseDefinition || (entryType === "word" && !synonyms.length)) {
+    throw new ApiError(
+      400,
+      entryType === "phrase"
+        ? "Phrase and Chinese meaning are required."
+        : "Word, Chinese meaning, and at least one synonym are required.",
+    );
   }
 
   const categories = new Set(["Reading vocabulary", "Emotion", "Attitude"]);
@@ -82,12 +96,13 @@ function normalizeEntry(value: unknown): VocabularyEntry {
       ? entry.id
       : `oc-custom-${randomUUID()}`,
     word,
+    entryType,
     definition: chineseDefinition,
     ...(pronunciation ? { pronounce: pronunciation } : {}),
     type: "OC Reading",
     level: 1,
     chineseDefinition,
-    synonyms,
+    ...(synonyms.length ? { synonyms } : {}),
     category,
   };
 }
@@ -102,7 +117,8 @@ function ocVocabularyWriteApi(): Plugin {
       if (!Array.isArray(current)) throw new Error("OC vocabulary JSON must contain an array.");
       if (current.some((item) => {
         const savedWord = asRecord(item)?.word;
-        return typeof savedWord === "string" && savedWord.toLowerCase() === entry.word.toLowerCase();
+        return typeof savedWord === "string" &&
+          normalizeVocabularyTerm(savedWord) === normalizeVocabularyTerm(entry.word);
       })) {
         throw new ApiError(409, `“${entry.word}” already exists in oc_vocab.json.`);
       }

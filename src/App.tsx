@@ -70,13 +70,16 @@ function isWordEntry(value: unknown): value is Word {
   return (
     typeof candidate.id === "string" &&
     typeof candidate.word === "string" &&
+    (candidate.entryType === undefined ||
+      candidate.entryType === "word" ||
+      candidate.entryType === "phrase") &&
     typeof candidate.definition === "string" &&
     typeof candidate.chineseDefinition === "string" &&
     candidate.chineseDefinition.trim().length > 0 &&
     (candidate.pronounce === undefined || typeof candidate.pronounce === "string") &&
-    Array.isArray(candidate.synonyms) &&
-    candidate.synonyms.length > 0 &&
-    candidate.synonyms.every((item) => typeof item === "string" && item.trim().length > 0)
+    (candidate.synonyms === undefined ||
+      (Array.isArray(candidate.synonyms) &&
+        candidate.synonyms.every((item) => typeof item === "string" && item.trim().length > 0)))
   );
 }
 
@@ -89,6 +92,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null
     ? value as Record<string, unknown>
     : null;
+}
+
+function normalizeVocabularyTerm(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
 }
 
 async function lookupDictionary(word: string): Promise<DictionaryLookup> {
@@ -179,11 +186,15 @@ function App() {
   const [words] = useState<Word[]>(wordsData as Word[]);
   const activeVocabulary = useMemo(() => {
     if (mode === "spelling") return words;
-    const merged = new Map(ocVocabData.map((word) => [word.word.toLowerCase(), word as Word]));
-    remoteOcWords.forEach((word) => merged.set(word.word.toLowerCase(), word));
-    customOcWords.forEach((word) => merged.set(word.word.toLowerCase(), word));
+    const merged = new Map(ocVocabData.map((word) => [normalizeVocabularyTerm(word.word), word as Word]));
+    remoteOcWords.forEach((word) => merged.set(normalizeVocabularyTerm(word.word), word));
+    customOcWords.forEach((word) => merged.set(normalizeVocabularyTerm(word.word), word));
     return Array.from(merged.values()).sort((a, b) => a.word.localeCompare(b.word));
   }, [customOcWords, mode, remoteOcWords, words]);
+  const quizVocabulary = useMemo(
+    () => activeVocabulary.filter((entry) => entry.entryType !== "phrase"),
+    [activeVocabulary],
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDefinition, setShowDefinition] = useState(false);
   const [unknownIdsByMode, setUnknownIdsByMode] = useState<Record<VocabularyMode, Set<string>>>(() => ({
@@ -201,6 +212,7 @@ function App() {
   const [speakingKey, setSpeakingKey] = useState<string | null>(null);
   const [translatedWord, setTranslatedWord] = useState<string | null>(null);
   const [translating, setTranslating] = useState(false);
+  const [entryType, setEntryType] = useState<"word" | "phrase">("word");
   const [entryWord, setEntryWord] = useState("");
   const [entryPronunciation, setEntryPronunciation] = useState("");
   const [entryChineseDefinition, setEntryChineseDefinition] = useState("");
@@ -598,6 +610,10 @@ function App() {
   const autoFillMissingOcFields = async () => {
     const word = entryWord.trim();
     const wordKey = word.toLowerCase();
+    if (entryType === "phrase") {
+      setEntryMessage("Auto-fill is for single words; enter phrase details manually.");
+      return;
+    }
     if (!word || autoFillWordsRef.current.has(wordKey)) return;
 
     const needsPronunciation = !entryPronunciation.trim();
@@ -698,11 +714,15 @@ function App() {
     const chineseDefinition = entryChineseDefinition.trim();
     const synonyms = entrySynonyms.split(",").map((item) => item.trim()).filter(Boolean);
 
-    if (!word || !chineseDefinition || synonyms.length === 0) {
-      setEntryMessage("Enter the word, Chinese meaning, and at least one synonym.");
+    if (!word || !chineseDefinition || (entryType === "word" && synonyms.length === 0)) {
+      setEntryMessage(
+        entryType === "phrase"
+          ? "Enter the phrase and its Chinese meaning."
+          : "Enter the word, Chinese meaning, and at least one synonym.",
+      );
       return;
     }
-    if (activeVocabulary.some((entry) => entry.word.toLowerCase() === word.toLowerCase())) {
+    if (activeVocabulary.some((entry) => normalizeVocabularyTerm(entry.word) === normalizeVocabularyTerm(word))) {
       setEntryMessage(`“${word}” is already in the OC vocabulary.`);
       return;
     }
@@ -718,13 +738,14 @@ function App() {
     const newWord: Word = {
       id: `oc-custom-${crypto.randomUUID()}`,
       word,
+      entryType,
       definition: chineseDefinition,
       chineseDefinition,
       ...(entryPronunciation.trim() ? { pronounce: entryPronunciation.trim() } : {}),
       type: "OC Reading",
       level: 1,
       category: entryCategory,
-      synonyms,
+      ...(synonyms.length ? { synonyms } : {}),
     };
     setEntryMessage(`Writing “${word}” to oc_vocab.json…`);
     try {
@@ -885,7 +906,7 @@ function App() {
 
   // Get unique levels
   const uniqueLevels: (number | null)[] = Array.from(
-    new Set(activeVocabulary.map((w) => w.level ?? null)),
+    new Set(quizVocabulary.map((w) => w.level ?? null)),
   ).sort((a, b) => (a || 0) - (b || 0));
 
   return (
@@ -1125,11 +1146,25 @@ function App() {
             >
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-indigo-900">OC Reading Quick Add</h2>
-                <p className="text-sm text-gray-500">Add a word to the OC vocabulary. On Vercel, it is shared across devices.</p>
+                <p className="text-sm text-gray-500">Add a word or phrase to the OC vocabulary. On Vercel, it is shared across devices.</p>
               </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <label className="text-sm font-semibold text-gray-700">
-                Word
+                Entry type
+                <select
+                  value={entryType}
+                  onChange={(event) => {
+                    setEntryType(event.target.value === "phrase" ? "phrase" : "word");
+                    setEntryMessage("");
+                  }}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-normal"
+                >
+                  <option value="word">Word</option>
+                  <option value="phrase">Phrase</option>
+                </select>
+              </label>
+              <label className="text-sm font-semibold text-gray-700">
+                {entryType === "phrase" ? "Phrase" : "Word"}
                 <input
                   required
                   value={entryWord}
@@ -1140,12 +1175,16 @@ function App() {
                     setEntryMessage("");
                     setAutoFillLoading(autoFillWordsRef.current.has(value.trim().toLowerCase()));
                   }}
-                  onBlur={() => void autoFillMissingOcFields()}
+                  onBlur={() => {
+                    if (entryType === "word") void autoFillMissingOcFields();
+                  }}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
-                  placeholder="e.g. reluctant"
+                  placeholder={entryType === "phrase" ? "e.g. take into account" : "e.g. reluctant"}
                 />
                 <span className="mt-1 block text-[11px] font-normal text-gray-500">
-                  Missing fields auto-fill when you leave this field.
+                  {entryType === "phrase"
+                    ? "Enter the meaning manually; phrases are not auto-filled."
+                    : "Missing fields auto-fill when you leave this field."}
                 </span>
               </label>
               <label className="text-sm font-semibold text-gray-700">
@@ -1168,13 +1207,13 @@ function App() {
                 />
               </label>
               <label className="text-sm font-semibold text-gray-700">
-                English synonyms
+                English synonyms{entryType === "phrase" ? " (optional)" : ""}
                 <input
-                  required
+                  required={entryType === "word"}
                   value={entrySynonyms}
                   onChange={(event) => setEntrySynonyms(event.target.value)}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
-                  placeholder="unwilling, hesitant"
+                  placeholder={entryType === "phrase" ? "optional" : "unwilling, hesitant"}
                 />
               </label>
               <label className="text-sm font-semibold text-gray-700">
@@ -1207,17 +1246,17 @@ function App() {
               <button
                 type="button"
                 onClick={() => void autoFillMissingOcFields()}
-                disabled={!entryWord.trim() || autoFillLoading}
+                disabled={!entryWord.trim() || autoFillLoading || entryType === "phrase"}
                 className="rounded-lg bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-800 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {autoFillLoading ? "Filling…" : "Auto-fill missing fields"}
+                {autoFillLoading ? "Filling…" : entryType === "phrase" ? "Auto-fill words only" : "Auto-fill missing fields"}
               </button>
               <button
                 type="submit"
                 disabled={autoFillLoading}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"
               >
-                Add word
+                Add {entryType}
               </button>
             </div>
             </form>
@@ -1230,7 +1269,7 @@ function App() {
       >
         {quizMode ? (
           <Quiz
-            words={activeVocabulary}
+            words={quizVocabulary}
             uniqueLevels={uniqueLevels}
             mode={mode === "oc" ? "meaning" : "spelling"}
             autoStart={autoStartQuiz}
@@ -1257,7 +1296,7 @@ function App() {
                   <span className="font-bold text-gray-800">
                     {unknownIds.size}
                   </span>{" "}
-                  words in your "Need Practice" list.
+                  {mode === "oc" ? "entries" : "words"} in your "Need Practice" list.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
                   <button
@@ -1305,7 +1344,7 @@ function App() {
                       handleCopy();
                     }}
                     className="text-gray-400 hover:text-gray-600 transition-colors"
-                    title="Copy word"
+                    title={currentWord?.entryType === "phrase" ? "Copy phrase" : "Copy word"}
                   >
                     {copied ? (
                       <svg
@@ -1357,8 +1396,17 @@ function App() {
                     </p>
                   </div>
                 )}
+                {currentWord?.entryType === "phrase" && (
+                  <span className="mb-2 inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-indigo-700">
+                    Phrase
+                  </span>
+                )}
                 <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
-                  <h2 className="text-4xl sm:text-6xl font-extrabold text-gray-900 tracking-tight">
+                  <h2 className={`font-extrabold text-gray-900 tracking-tight break-words ${
+                    currentWord?.entryType === "phrase"
+                      ? "text-3xl sm:text-4xl"
+                      : "text-4xl sm:text-6xl"
+                  }`}>
                     {currentWord?.word}
                   </h2>
                   <SpeakerIcon
@@ -1367,7 +1415,7 @@ function App() {
                       e.stopPropagation();
                       handleSpeak(currentWord?.word || "", "word");
                     }}
-                    title="Read word aloud"
+                    title={currentWord?.entryType === "phrase" ? "Read phrase aloud" : "Read word aloud"}
                   />
                 </div>
                 <div className="flex items-center justify-center gap-4 mb-4">
@@ -1440,7 +1488,7 @@ function App() {
             )}
             {!completed && activeWords.length > 0 && (
               <div className="mt-4 text-gray-500 font-medium">
-                Word {currentIndex + 1} of {activeWords.length}
+                Entry {currentIndex + 1} of {activeWords.length}
                 {reviewMode && (
                   <span className="ml-2 text-indigo-500">
                     ({unknownIds.size} remaining to review)

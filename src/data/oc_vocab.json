@@ -394,5 +394,122 @@
     "category": "Reading vocabulary",
     "synonyms": ["careful", "wary", "prudent"],
     "example": "The cautious hiker checked the map before continuing."
+  },
+  {
+    "id": "oc-037",
+    "word": "tiresome",
+    "entryType": "word",
+    "definition": "making you feel bored or tired because it lasts too long or is repetitive",
+    "chineseDefinition": "令人厌倦的；烦人的",
+    "pronounce": "/ˈtaɪəsəm/",
+    "type": "adjective",
+    "category": "Reading vocabulary",
+    "synonyms": ["tedious", "boring", "wearisome"],
+    "example": "The long, tiresome journey felt even slower in the rain."
+  },
+  {
+    "id": "oc-038",
+    "word": "dull",
+    "entryType": "word",
+    "definition": "not interesting or exciting",
+    "chineseDefinition": "枯燥的；乏味的",
+    "pronounce": "/dʌl/",
+    "type": "adjective",
+    "category": "Reading vocabulary",
+    "synonyms": ["boring", "tedious", "uninteresting"],
+    "example": "The lecture seemed dull until the speaker began showing experiments."
+  },
+  {
+    "id": "oc-039",
+    "word": "drag",
+    "entryType": "word",
+    "definition": "a boring or tiring experience that seems to last a long time",
+    "chineseDefinition": "令人厌烦的事；苦差事",
+    "pronounce": "/dræɡ/",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["bore", "chore", "nuisance"],
+    "example": "Waiting for the delayed bus was a real drag."
+  },
+  {
+    "id": "oc-040",
+    "word": "occasional",
+    "entryType": "word",
+    "definition": "happening sometimes, but not often or regularly",
+    "chineseDefinition": "偶尔发生的；不经常的",
+    "pronounce": "/əˈkeɪʒənəl/",
+    "type": "adjective",
+    "category": "Reading vocabulary",
+    "synonyms": ["infrequent", "sporadic", "periodic"],
+    "example": "We heard the occasional bird call from the trees."
+  },
+  {
+    "id": "oc-041",
+    "word": "frequent",
+    "entryType": "word",
+    "definition": "happening often or at short intervals",
+    "chineseDefinition": "频繁的；经常发生的",
+    "pronounce": "/ˈfriːkwənt/",
+    "type": "adjective",
+    "category": "Reading vocabulary",
+    "synonyms": ["common", "regular", "recurring"],
+    "example": "Frequent practice helped the team improve."
+  },
+  {
+    "id": "oc-042",
+    "word": "cost an arm and a leg",
+    "entryType": "phrase",
+    "definition": "to be extremely expensive",
+    "chineseDefinition": "非常昂贵；贵得离谱",
+    "type": "idiom",
+    "category": "Reading vocabulary",
+    "synonyms": ["cost a fortune", "be very expensive"],
+    "example": "That designer jacket costs an arm and a leg."
+  },
+  {
+    "id": "oc-043",
+    "word": "on cloud nine",
+    "entryType": "phrase",
+    "definition": "feeling extremely happy",
+    "chineseDefinition": "欣喜若狂；极其开心",
+    "type": "idiom",
+    "category": "Reading vocabulary",
+    "synonyms": ["overjoyed", "elated", "thrilled"],
+    "example": "She was on cloud nine after hearing the good news."
+  },
+  {
+    "id": "oc-044",
+    "word": "beacon",
+    "entryType": "word",
+    "definition": "a light or signal that guides or warns people",
+    "chineseDefinition": "灯塔；指引方向的信号",
+    "pronounce": "/ˈbiːkən/",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["signal", "guide", "lighthouse"],
+    "example": "The lighthouse beacon guided ships safely towards the harbour."
+  },
+  {
+    "id": "oc-045",
+    "word": "beat around the bush",
+    "entryType": "phrase",
+    "definition": "to avoid talking about something directly",
+    "chineseDefinition": "拐弯抹角；不直接谈重点",
+    "type": "idiom",
+    "category": "Reading vocabulary",
+    "synonyms": ["be indirect", "avoid the point", "evade the issue"],
+    "example": "Instead of beating around the bush, Kai explained what had happened."
+  },
+  {
+    "id": "oc-046",
+    "word": "cosmos",
+    "entryType": "word",
+    "definition": "the universe, especially when thought of as an ordered system",
+    "chineseDefinition": "宇宙；有序的宇宙体系",
+    "pronounce": "/ˈkɒzmɒs/",
+    "type": "noun",
+    "category": "Reading vocabulary",
+    "synonyms": ["universe", "space", "creation"],
+    "example": "Scientists use telescopes to study distant parts of the cosmos."
   }
 ]

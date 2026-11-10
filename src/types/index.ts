@@ -1,6 +1,7 @@
 export interface Word {
   id: string;
   word: string;
+  entryType?: "word" | "phrase";
   definition: string;
   pronounce?: string;
   type?: string;

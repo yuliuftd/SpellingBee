@@ -1432,14 +1432,14 @@ function App() {
                     </p>
                   )}
                 </div>
-                {mode === "oc" && currentWord?.definition && (
-                  <p className="mx-auto mb-3 max-w-xl text-base leading-relaxed text-gray-700">
-                    {currentWord.definition}
-                  </p>
-                )}
                 <div
                   className={`transition-opacity duration-300 ${showDefinition ? "opacity-100" : "opacity-0"}`}
                 >
+                  {mode === "oc" && currentWord?.definition && (
+                    <p className="mx-auto mb-3 max-w-xl text-xl leading-relaxed text-gray-700">
+                      {currentWord.definition}
+                    </p>
+                  )}
                   <div className="flex items-center justify-center gap-3 mb-6">
                     <p className="text-2xl text-gray-600 leading-relaxed max-w-xl">
                       {mode === "oc"
@@ -1490,7 +1490,7 @@ function App() {
             )}
             {!completed && activeWords.length > 0 && (
               <div className="mt-4 text-gray-500 font-medium">
-                Entry {currentIndex + 1} of {activeWords.length}
+                {currentIndex + 1} of {activeWords.length}
                 {reviewMode && (
                   <span className="ml-2 text-indigo-500">
                     ({unknownIds.size} remaining to review)

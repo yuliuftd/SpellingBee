@@ -449,6 +449,8 @@ function App() {
     let jumpTimeout: ReturnType<typeof setTimeout> | undefined;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+
       // Ignore key events if focus is on an input or textarea
       if (
         document.activeElement?.tagName === "INPUT" ||
@@ -1430,9 +1432,9 @@ function App() {
                     </p>
                   )}
                 </div>
-                {mode === "oc" && currentWord?.category && (
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-indigo-500">
-                    {currentWord.category}
+                {mode === "oc" && currentWord?.definition && (
+                  <p className="mx-auto mb-3 max-w-xl text-base leading-relaxed text-gray-700">
+                    {currentWord.definition}
                   </p>
                 )}
                 <div

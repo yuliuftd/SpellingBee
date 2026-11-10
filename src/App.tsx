@@ -171,13 +171,19 @@ function App() {
   });
   const [customWordsState, setCustomWordsState] = useState<CustomWordsState>(readCustomOcWords);
   const customOcWords = customWordsState.words;
+  const [remoteOcWords, setRemoteOcWords] = useState<Word[]>([]);
+  const [writePasswordRequired, setWritePasswordRequired] = useState(false);
+  const [writePassword, setWritePassword] = useState("");
+  const [vocabularyApiLoaded, setVocabularyApiLoaded] = useState(false);
+  const [remoteVocabularyError, setRemoteVocabularyError] = useState("");
   const [words] = useState<Word[]>(wordsData as Word[]);
   const activeVocabulary = useMemo(() => {
     if (mode === "spelling") return words;
     const merged = new Map(ocVocabData.map((word) => [word.word.toLowerCase(), word as Word]));
+    remoteOcWords.forEach((word) => merged.set(word.word.toLowerCase(), word));
     customOcWords.forEach((word) => merged.set(word.word.toLowerCase(), word));
     return Array.from(merged.values()).sort((a, b) => a.word.localeCompare(b.word));
-  }, [customOcWords, mode, words]);
+  }, [customOcWords, mode, remoteOcWords, words]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showDefinition, setShowDefinition] = useState(false);
   const [unknownIdsByMode, setUnknownIdsByMode] = useState<Record<VocabularyMode, Set<string>>>(() => ({
@@ -219,6 +225,45 @@ function App() {
     const key = mode === "oc" ? OC_UNKNOWN_STORAGE_KEY : STORAGE_KEY;
     localStorage.setItem(key, JSON.stringify(Array.from(unknownIds)));
   }, [mode, unknownIds]);
+
+  useEffect(() => {
+    let active = true;
+    const loadRemoteVocabulary = async () => {
+      try {
+        const response = await fetch("/api/oc-vocabulary");
+        const payload: unknown = await response.json();
+        const result = asRecord(payload);
+        if (active && typeof result?.writePasswordRequired === "boolean") {
+          setWritePasswordRequired(result.writePasswordRequired);
+        }
+        if (!response.ok) {
+          throw new Error(
+            typeof result?.error === "string" ? result.error : `Vocabulary API failed (${response.status}).`,
+          );
+        }
+        if (!Array.isArray(result?.entries) || !result.entries.every(isWordEntry)) {
+          throw new Error("Vocabulary API returned an invalid word list.");
+        }
+        if (active) {
+          setRemoteOcWords(result.entries);
+          setRemoteVocabularyError("");
+        }
+      } catch (error) {
+        if (active) {
+          setRemoteVocabularyError(
+            error instanceof Error ? error.message : "Could not load the online OC vocabulary.",
+          );
+        }
+      } finally {
+        if (active) setVocabularyApiLoaded(true);
+      }
+    };
+
+    void loadRemoteVocabulary();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -661,6 +706,14 @@ function App() {
       setEntryMessage(`“${word}” is already in the OC vocabulary.`);
       return;
     }
+    if (!vocabularyApiLoaded) {
+      setEntryMessage("The online vocabulary is still loading. Try again in a moment.");
+      return;
+    }
+    if (writePasswordRequired && !writePassword.trim()) {
+      setEntryMessage("Enter the OC vocabulary write password.");
+      return;
+    }
 
     const newWord: Word = {
       id: `oc-custom-${crypto.randomUUID()}`,
@@ -677,15 +730,23 @@ function App() {
     try {
       const response = await fetch("/api/oc-vocabulary", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(writePasswordRequired ? { Authorization: `Bearer ${writePassword}` } : {}),
+        },
         body: JSON.stringify({ entry: newWord }),
       });
 
       let payload: unknown;
+      if (!response.headers.get("content-type")?.includes("application/json")) {
+        throw new Error(
+          `No JSON response from the vocabulary API at ${window.location.origin}. Check that the Vercel function is deployed; locally, use the SpellingBee URL printed by npm run dev.`,
+        );
+      }
       try {
         payload = await response.json();
       } catch {
-        throw new Error("The vocabulary write API is unavailable. Run the app with `npm run dev`.");
+        throw new Error(`The vocabulary write API at ${window.location.origin} returned invalid JSON.`);
       }
       const result = asRecord(payload);
       if (!response.ok) {
@@ -698,6 +759,12 @@ function App() {
       }
 
       const savedEntry = result.entry;
+      setRemoteOcWords((current) => {
+        const merged = new Map(current.map((item) => [item.word.toLowerCase(), item]));
+        merged.set(savedEntry.word.toLowerCase(), savedEntry);
+        return Array.from(merged.values());
+      });
+      setRemoteVocabularyError("");
       const nextWords = [...customOcWords, savedEntry];
       let cacheWarning = "";
       try {
@@ -711,10 +778,13 @@ function App() {
       setEntryPronunciation("");
       setEntryChineseDefinition("");
       setEntrySynonyms("");
+      setWritePassword("");
       setEntryMessage(
         cacheWarning
-          ? `Added “${word}” to oc_vocab.json. Browser cache warning: ${cacheWarning}`
-          : `Added “${word}” to src/data/oc_vocab.json.`,
+          ? `Added “${word}” to the OC vocabulary. Browser cache warning: ${cacheWarning}`
+          : writePasswordRequired
+            ? `Added “${word}” to the online OC vocabulary.`
+            : `Added “${word}” to the local OC vocabulary file.`,
       );
       setAutoFillLoading(false);
       setCurrentIndex(0);
@@ -724,8 +794,8 @@ function App() {
     } catch (error) {
       setEntryMessage(
         error instanceof Error
-          ? `Could not write “${word}” to oc_vocab.json: ${error.message}`
-          : `Could not write “${word}” to oc_vocab.json.`,
+          ? `Could not add “${word}” to the OC vocabulary: ${error.message}`
+          : `Could not add “${word}” to the OC vocabulary.`,
       );
     }
   };
@@ -1038,11 +1108,14 @@ function App() {
 
       <section className="w-full max-w-5xl px-4">
         <div className="h-5 overflow-hidden text-sm leading-5">
-          {mode === "oc" && !quizMode && customWordsState.error && (
-            <p className="truncate text-red-600" role="alert">{customWordsState.error}</p>
-          )}
-          {mode === "oc" && !quizMode && !customWordsState.error && entryMessage && (
+          {mode === "oc" && !quizMode && entryMessage && (
             <p className="truncate text-indigo-700" role="status">{entryMessage}</p>
+          )}
+          {mode === "oc" && !quizMode && !entryMessage && remoteVocabularyError && (
+            <p className="truncate text-red-600" role="alert">{remoteVocabularyError}</p>
+          )}
+          {mode === "oc" && !quizMode && !entryMessage && !remoteVocabularyError && customWordsState.error && (
+            <p className="truncate text-red-600" role="alert">{customWordsState.error}</p>
           )}
         </div>
         {mode === "oc" && !quizMode && showOcAddForm && (
@@ -1052,7 +1125,7 @@ function App() {
             >
               <div className="mb-4">
                 <h2 className="text-lg font-bold text-indigo-900">OC Reading Quick Add</h2>
-                <p className="text-sm text-gray-500">Save a new reading word to this browser’s OC vocabulary.</p>
+                <p className="text-sm text-gray-500">Add a word to the OC vocabulary. On Vercel, it is shared across devices.</p>
               </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <label className="text-sm font-semibold text-gray-700">
@@ -1116,6 +1189,19 @@ function App() {
                   <option>Attitude</option>
                 </select>
               </label>
+              {writePasswordRequired && (
+                <label className="text-sm font-semibold text-gray-700">
+                  Write password
+                  <input
+                    required
+                    type="password"
+                    autoComplete="current-password"
+                    value={writePassword}
+                    onChange={(event) => setWritePassword(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal"
+                  />
+                </label>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button

@@ -130,8 +130,23 @@ function ocVocabularyWriteApi(): Plugin {
     request: IncomingMessage,
     response: ServerResponse,
   ) => {
+    if (request.method === "GET") {
+      try {
+        const entries: unknown = JSON.parse(await readFile(vocabularyFile, "utf8"));
+        if (!Array.isArray(entries)) throw new Error("OC vocabulary JSON must contain an array.");
+        sendJson(response, 200, { entries, writePasswordRequired: false });
+      } catch (error) {
+        sendJson(
+          response,
+          500,
+          { error: error instanceof Error ? `Could not read oc_vocab.json: ${error.message}` : "Could not read oc_vocab.json." },
+        );
+      }
+      return;
+    }
+
     if (request.method !== "POST") {
-      response.setHeader("Allow", "POST");
+      response.setHeader("Allow", "GET, POST");
       sendJson(response, 405, { error: "Method not allowed." });
       return;
     }
@@ -181,4 +196,7 @@ function ocVocabularyWriteApi(): Plugin {
 
 export default defineConfig({
   plugins: [react(), ocVocabularyWriteApi()],
+  server: {
+    open: true,
+  },
 });

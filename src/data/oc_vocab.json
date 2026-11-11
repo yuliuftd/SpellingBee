@@ -1936,7 +1936,7 @@
     "word": "ornate",
     "entryType": "word",
     "definition": "decorated with many detailed or elaborate designs",
-    "chineseDefinition": "装饰华丽的； ornate",
+    "chineseDefinition": "装饰华丽的；华美的",
     "type": "adjective",
     "category": "Reading vocabulary",
     "synonyms": ["elaborate", "decorative", "embellished"],
@@ -1963,5 +1963,49 @@
     "category": "Reading vocabulary",
     "synonyms": ["applied science", "engineering", "technical innovation"],
     "example": "Modern technology allows people to communicate across long distances."
+  },
+  {
+    "id": "oc-179",
+    "word": "deform",
+    "entryType": "word",
+    "definition": "to change the shape or appearance of something, usually in a damaging way",
+    "chineseDefinition": "使变形；损坏……的形状",
+    "type": "verb",
+    "category": "Reading vocabulary",
+    "synonyms": ["distort", "misshape", "warp"],
+    "example": "Too much heat can deform the plastic container."
+  },
+  {
+    "id": "oc-180",
+    "word": "perking",
+    "entryType": "word",
+    "definition": "becoming more cheerful, lively, or energetic",
+    "chineseDefinition": "精神起来；活跃起来",
+    "type": "verb form",
+    "category": "Reading vocabulary",
+    "synonyms": ["brightening", "cheering up", "reviving"],
+    "example": "Her mood was perking up after she heard the good news."
+  },
+  {
+    "id": "oc-181",
+    "word": "exceeded",
+    "entryType": "word",
+    "definition": "went beyond a limit, amount, or expectation",
+    "chineseDefinition": "超过；超出",
+    "type": "verb",
+    "category": "Reading vocabulary",
+    "synonyms": ["surpassed", "outdid", "went beyond"],
+    "example": "The final result exceeded everyone's expectations."
+  },
+  {
+    "id": "oc-182",
+    "word": "formerly",
+    "entryType": "word",
+    "definition": "at an earlier time; in the past",
+    "chineseDefinition": "以前；从前",
+    "type": "adverb",
+    "category": "Reading vocabulary",
+    "synonyms": ["previously", "once", "earlier"],
+    "example": "The building, formerly a theatre, is now a library."
   }
 ]

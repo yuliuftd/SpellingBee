@@ -1406,8 +1406,8 @@ function App() {
                 <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-4">
                   <h2 className={`font-extrabold text-gray-900 tracking-tight break-words ${
                     currentWord?.entryType === "phrase"
-                      ? "text-3xl sm:text-4xl"
-                      : "text-4xl sm:text-6xl"
+                      ? "text-2xl sm:text-4xl"
+                      : "text-3xl sm:text-6xl"
                   }`}>
                     {currentWord?.word}
                   </h2>

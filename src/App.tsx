@@ -1446,17 +1446,12 @@ function App() {
                         ? currentWord?.chineseDefinition ?? currentWord?.definition
                         : currentWord?.definition}
                     </p>
-                    {(currentWord?.definition || currentWord?.chineseDefinition) && (
+                    {mode !== "oc" && currentWord?.definition && (
                       <SpeakerIcon
                         isPlaying={speakingKey === "definition"}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleSpeak(
-                            mode === "oc"
-                              ? currentWord.chineseDefinition ?? currentWord.definition
-                              : currentWord.definition,
-                            "definition",
-                          );
+                          handleSpeak(currentWord.definition, "definition");
                         }}
                         title="Read definition aloud"
                       />

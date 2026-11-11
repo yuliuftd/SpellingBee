@@ -68,14 +68,14 @@ export default function Quiz({
       ? selected.map((question) => {
           const correctOption = {
             id: question.id,
-            label: question.chineseDefinition ?? question.definition,
+        label: question.definition,
           };
           const distractors = shuffleArray(
             words.filter((candidate) => candidate.id !== question.id),
           )
             .map((candidate) => ({
               id: candidate.id,
-              label: candidate.chineseDefinition ?? candidate.definition,
+              label: candidate.definition,
             }))
             .filter((option, index, list) =>
               option.label !== correctOption.label &&
@@ -126,7 +126,7 @@ export default function Quiz({
       const uAnswer = userAnswers[idx] || "";
       const selectedOption = quizOptions[idx]?.find((option) => option.id === uAnswer);
       const expectedAnswer = mode === "meaning"
-        ? q.chineseDefinition ?? q.definition
+        ? q.definition
         : q.word;
       const isCorrect = mode === "meaning"
         ? uAnswer === q.id
@@ -165,7 +165,7 @@ export default function Quiz({
         <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 space-y-6">
           <h2 className="text-3xl font-bold text-indigo-700">OC Reading Meaning Quiz 🎯</h2>
           <p className="text-gray-600 text-lg">
-            Choose the correct Chinese meaning for 10 randomly selected OC reading words.
+            Choose the correct English definition for 10 randomly selected OC reading words.
           </p>
           <p className="text-sm text-gray-500">{words.length} words available</p>
           <button
@@ -237,7 +237,7 @@ export default function Quiz({
 
         {mode === "meaning" ? (
           <div className="space-y-5">
-            <h3 className="text-lg text-gray-600">Choose the correct meaning:</h3>
+            <h3 className="text-lg text-gray-600">Choose the correct English definition:</h3>
             <p className="text-4xl font-bold text-gray-900">
               {quizQuestions[quizCurrentIndex]?.word}
             </p>

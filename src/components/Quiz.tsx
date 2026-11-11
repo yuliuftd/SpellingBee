@@ -306,7 +306,7 @@ export default function Quiz({
     if (mode === "meaning") {
       return (
         <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-12 space-y-6">
-          <h2 className="text-3xl font-bold text-indigo-700">OC Reading Meaning Quiz 🎯</h2>
+          <h2 className="text-3xl font-bold text-indigo-700">OC Vocabulary Quiz 🎯</h2>
           <p className="text-gray-600 text-lg">
             Choose the correct English definition for 10 randomly selected OC reading words.
           </p>

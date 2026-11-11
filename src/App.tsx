@@ -981,7 +981,7 @@ function App() {
                 }`}
               >
                 {mode === "oc"
-                  ? quizMode ? "OC Meaning Quiz (Active)" : "OC Meaning Quiz"
+                  ? quizMode ? "OC Vocabulary Quiz (Active)" : "OC Vocabulary Quiz"
                   : quizMode ? "Quiz Mode (Active)" : "Quiz Mode"}
               </button>
               <button
@@ -1009,7 +1009,7 @@ function App() {
                     aria-expanded={showOcAddForm}
                     className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-100"
                   >
-                    {showOcAddForm ? "Hide Add Word Form" : "Add OC Word"}
+                    {showOcAddForm ? "Hide Add Word Form" : "Add New Word"}
                   </button>
                   <button
                     type="button"

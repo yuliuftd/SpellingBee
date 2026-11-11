@@ -205,7 +205,7 @@ function App() {
   const [reviewMode, setReviewMode] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
-  const [randomMode, setRandomMode] = useState(false);
+  const [randomMode, setRandomMode] = useState(() => mode === "oc");
   const [copied, setCopied] = useState(false);
   const [jumpInput, setJumpInput] = useState("");
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -574,7 +574,7 @@ function App() {
     setEntryMessage("");
     setReviewMode(false);
     setSelectedLevel(null);
-    setRandomMode(false);
+    setRandomMode(nextMode === "oc");
     setCurrentIndex(0);
     setCompleted(false);
     setShowDefinition(false);

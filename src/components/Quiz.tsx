@@ -17,6 +17,127 @@ interface QuizProps {
   autoStart?: boolean;
 }
 
+const OC_QUIZ_SCORE_STORAGE_KEY = "spellingBee_ocQuizScores";
+
+interface QuizScore {
+  completedAt: string;
+  correct: number;
+  total: number;
+  percentage: number;
+}
+
+interface QuizScoreHistory {
+  scores: QuizScore[];
+  error: string;
+}
+
+function isQuizScore(value: unknown): value is QuizScore {
+  if (typeof value !== "object" || value === null) return false;
+  const score = value as Partial<QuizScore>;
+  return (
+    typeof score.completedAt === "string" &&
+    Number.isFinite(Date.parse(score.completedAt)) &&
+    Number.isInteger(score.correct) &&
+    Number.isInteger(score.total) &&
+    Number.isInteger(score.percentage) &&
+    (score.correct ?? -1) >= 0 &&
+    (score.total ?? 0) > 0 &&
+    (score.correct ?? Infinity) <= (score.total ?? 0) &&
+    (score.percentage ?? -1) >= 0 &&
+    (score.percentage ?? 101) <= 100
+  );
+}
+
+function readQuizScoreHistory(): QuizScoreHistory {
+  try {
+    const saved = localStorage.getItem(OC_QUIZ_SCORE_STORAGE_KEY);
+    if (!saved) return { scores: [], error: "" };
+    const parsed: unknown = JSON.parse(saved);
+    if (!Array.isArray(parsed) || !parsed.every(isQuizScore)) {
+      throw new Error("Saved OC quiz scores have an invalid format.");
+    }
+    return { scores: parsed, error: "" };
+  } catch (error) {
+    console.error("Could not read saved OC quiz scores.", error);
+    return {
+      scores: [],
+      error: error instanceof Error ? error.message : "Could not read saved OC quiz scores.",
+    };
+  }
+}
+
+function QuizScoreHistoryChart({ scores, error }: QuizScoreHistory) {
+  const chartLeft = 52;
+  const chartTop = 18;
+  const chartWidth = 570;
+  const chartHeight = 150;
+  const points = scores.map((score, index) => {
+    const x = scores.length === 1
+      ? chartLeft + chartWidth / 2
+      : chartLeft + (index / (scores.length - 1)) * chartWidth;
+    const y = chartTop + ((100 - score.percentage) / 100) * chartHeight;
+    return { x, y, score };
+  });
+
+  return (
+    <section className="rounded-xl bg-gray-50 p-4 text-left" aria-label="OC quiz score history">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-bold text-gray-800">OC Quiz Score History</h3>
+        {scores.length > 0 && (
+          <p className="text-sm text-gray-600">
+            Latest: <span className="font-bold text-indigo-700">{scores[scores.length - 1].percentage}%</span>
+          </p>
+        )}
+      </div>
+      {error && <p className="mb-2 text-sm text-red-700" role="alert">{error}</p>}
+      {scores.length === 0 ? (
+        <p className="py-6 text-center text-sm text-gray-500">Complete an OC quiz to start your score history.</p>
+      ) : (
+        <>
+          <svg
+            viewBox="0 0 640 220"
+            className="w-full"
+            role="img"
+            aria-label={`OC quiz scores over ${scores.length} attempts`}
+          >
+            {[0, 50, 100].map((value) => {
+              const y = chartTop + ((100 - value) / 100) * chartHeight;
+              return (
+                <g key={value}>
+                  <line x1={chartLeft} x2={chartLeft + chartWidth} y1={y} y2={y} stroke="#d1d5db" strokeDasharray="4 4" />
+                  <text x={chartLeft - 8} y={y + 4} textAnchor="end" fill="#6b7280" fontSize="12">{value}%</text>
+                </g>
+              );
+            })}
+            {points.length > 1 && (
+              <polyline
+                fill="none"
+                stroke="#4f46e5"
+                strokeWidth="3"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                points={points.map(({ x, y }) => `${x},${y}`).join(" ")}
+              />
+            )}
+            {points.map(({ x, y, score }, index) => (
+              <circle key={`${score.completedAt}-${index}`} cx={x} cy={y} r="4" fill="#4f46e5">
+                <title>
+                  Attempt {index + 1}: {score.correct}/{score.total} ({score.percentage}%) on{" "}
+                  {new Date(score.completedAt).toLocaleString()}
+                </title>
+              </circle>
+            ))}
+            <text x={chartLeft} y="202" fill="#6b7280" fontSize="12">Attempt 1</text>
+            <text x={chartLeft + chartWidth} y="202" textAnchor="end" fill="#6b7280" fontSize="12">
+              Attempt {scores.length}
+            </text>
+          </svg>
+        </>
+      )}
+    </section>
+  );
+}
+
 function shuffleArray<T,>(items: T[]): T[] {
   const shuffled = [...items];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -45,6 +166,9 @@ export default function Quiz({
     total: number;
     answers: { word: string; expectedAnswer: string; userAnswer: string; correct: boolean }[];
   } | null>(null);
+  const [scoreHistory, setScoreHistory] = useState<QuizScoreHistory>(() =>
+    mode === "meaning" ? readQuizScoreHistory() : { scores: [], error: "" },
+  );
   const autoStartApplied = useRef(false);
 
   // Auto-play word in quiz mode when a question appears
@@ -145,6 +269,25 @@ export default function Quiz({
       total: quizQuestions.length,
       answers,
     });
+    if (mode === "meaning" && quizQuestions.length > 0) {
+      const score: QuizScore = {
+        completedAt: new Date().toISOString(),
+        correct: correctCount,
+        total: quizQuestions.length,
+        percentage: Math.round((correctCount / quizQuestions.length) * 100),
+      };
+      const nextHistory = { scores: [...scoreHistory.scores, score], error: "" };
+      setScoreHistory(nextHistory);
+      try {
+        localStorage.setItem(OC_QUIZ_SCORE_STORAGE_KEY, JSON.stringify(nextHistory.scores));
+      } catch (error) {
+        console.error("Could not save the OC quiz score.", error);
+        setScoreHistory({
+          ...nextHistory,
+          error: error instanceof Error ? error.message : "Could not save the OC quiz score.",
+        });
+      }
+    }
     setQuizStarted(false);
   };
 
@@ -168,6 +311,7 @@ export default function Quiz({
             Choose the correct English definition for 10 randomly selected OC reading words.
           </p>
           <p className="text-sm text-gray-500">{words.length} words available</p>
+          <QuizScoreHistoryChart {...scoreHistory} />
           <button
             onClick={() => startQuiz(null)}
             disabled={words.length === 0}
@@ -346,6 +490,7 @@ export default function Quiz({
         <p className="text-xl text-gray-600">
           You got {Math.round((quizResults.correct / quizResults.total) * 100)}% correct!
         </p>
+        {mode === "meaning" && <QuizScoreHistoryChart {...scoreHistory} />}
 
         <div className="bg-gray-50 rounded-lg p-6 max-h-96 overflow-y-auto space-y-4 text-left">
           <h3 className="font-bold text-lg text-gray-800 text-center">Results:</h3>

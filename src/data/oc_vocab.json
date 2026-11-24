@@ -3583,14 +3583,14 @@
   },
   {
     "id": "oc-323",
-    "word": "chronboloigst",
+    "word": "chronobiologist",
     "entryType": "word",
-    "definition": "a term entered exactly as provided in this word list",
-    "chineseDefinition": "按所提供拼写录入的词条",
+    "definition": "a biologist who studies biological rhythms, especially circadian rhythms",
+    "chineseDefinition": "研究生物节律（尤其是昼夜节律）的生物学家",
     "type": "noun",
     "category": "Reading vocabulary",
-    "synonyms": ["specialist", "researcher"],
-    "example": "The students looked up the meaning of chronboloigst in their passage."
+    "synonyms": ["biological-rhythm researcher", "circadian-rhythm researcher"],
+    "example": "The chronobiologist studied how daylight affects people's sleep cycles."
   },
   {
     "id": "oc-324",
